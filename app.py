@@ -572,14 +572,8 @@ def add_counseling():
 
 
 
-        if matched_sheet_raw in ["개인메모", "개인 메모", "개인일지"]:
-            matched_sheet = "개인메모"
-        elif matched_sheet_raw == "상담일지":
-            matched_sheet = "상담일지"
-        elif matched_sheet_raw == "활동일지":
-            matched_sheet = "활동일지"
-        else:
-            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})        
+        if matched_sheet not in ["상담일지", "개인메모", "활동일지"]:
+            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})     
 
 
 
