@@ -122,7 +122,12 @@ def get_worksheet(sheet_name):
         client = gspread.authorize(creds)
 
 
-        sheet = client.open("members_list_main")
+# 👉 환경변수에서 시트 제목 가져오기
+        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
+        if not sheet_title:
+            raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+        sheet = client.open(sheet_title)
+        
 
 
         return sheet.worksheet(sheet_name)
@@ -605,7 +610,7 @@ def add_counseling():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-        
+
 
 
 
@@ -702,7 +707,15 @@ def debug_sheets():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)  # ✅ 이 줄 추가
-        sheet = client.open("members_list_main")
+
+
+        # ✅ 환경변수에서 시트 이름 가져오기
+        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
+        if not sheet_title:
+            raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+        sheet = client.open(sheet_title)
+
+
         titles = [ws.title for ws in sheet.worksheets()]
         return jsonify({"시트목록": titles})
     except Exception as e:
