@@ -556,7 +556,7 @@ def add_counseling():
         action_keywords = ["저장", "기록", "입력"]
 
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
-            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
+            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '개인 메모', '개인일지', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
         match = re.search(r'([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력)', text)
         if not match:
@@ -571,9 +571,14 @@ def add_counseling():
         text = text.strip()
 
 
-
-        if matched_sheet not in ["상담일지", "개인메모", "활동일지"]:
-            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})     
+        if matched_sheet_raw in ["개인메모", "개인 메모", "개인일지"]:
+            matched_sheet = "개인메모"
+        elif matched_sheet_raw == "상담일지":
+            matched_sheet = "상담일지"
+        elif matched_sheet_raw == "활동일지":
+            matched_sheet = "활동일지"
+        else:
+            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})      
 
 
 
