@@ -14,11 +14,19 @@ from collections import Counter
 
 
 
+
+
+load_dotenv()  # 꼭 먼저 실행돼야 함
+print("TEST_VARIABLE =", os.getenv("TEST_VARIABLE"))
+
+
+
 # ✅ 환경 변수 로드
 load_dotenv()
 app = Flask(__name__)
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
+
 
 
 
