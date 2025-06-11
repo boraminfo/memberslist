@@ -120,7 +120,11 @@ def get_worksheet(sheet_name):
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)
+
+
         sheet = client.open("members_list_main")
+
+
         return sheet.worksheet(sheet_name)
     except Exception as e:
         print(f"[시트 접근 오류] {e}")
@@ -551,47 +555,57 @@ def add_counseling():
     try:
         data = request.get_json()
         text = data.get("요청문", "")
+        mode = data.get("mode", "1")
 
-        sheet_keywords = ["상담일지", "개인메모", "개인 메모", "개인일지", "활동일지", "직접입력"]
+        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
         action_keywords = ["저장", "기록", "입력"]
 
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
-            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '개인 메모', '개인일지', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
+            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
+        # 정확한 회원명 추출
         match = re.search(r'([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력)', text)
         if not match:
             return jsonify({"message": "회원명을 인식할 수 없습니다."})
         member_name = match.group(1)
-        matched_sheet = match.group(2)
 
+        # 명령어 제거
         for kw in sheet_keywords + action_keywords:
             text = text.replace(f"{member_name}{kw}", "")
             text = text.replace(f"{member_name} {kw}", "")
             text = text.replace(kw, "")
         text = text.strip()
 
+        # mode 값에 따라 저장 대상 시트 결정
+        mode_map = {
+            "1": ["상담일지"],
+            "2": ["개인메모"],
+            "3": ["상담일지", "활동일지"],
+            "4": ["개인메모", "활동일지"],
+            "5": []
+        }
+        target_sheets = mode_map.get(mode, ["상담일지", "개인메모", "활동일지"])
 
-        if matched_sheet_raw in ["개인메모", "개인 메모", "개인일지"]:
-            matched_sheet = "개인메모"
-        elif matched_sheet_raw == "상담일지":
-            matched_sheet = "상담일지"
-        elif matched_sheet_raw == "활동일지":
-            matched_sheet = "활동일지"
+        if not target_sheets:
+            return jsonify({"message": "저장이 취소되었습니다."})
+
+        saved = False
+        for sheet in target_sheets:
+            if save_to_sheet(sheet, member_name, text):
+                saved = True
+            else:
+                return jsonify({"message": f"같은 내용이 이미 '{sheet}' 시트에 저장되어 있습니다."})
+
+        if saved:
+            return jsonify({"message": f"{member_name}님의 상담일지 저장이 완료되었습니다."})
         else:
-            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})      
-
-
-
-
-        if save_to_sheet(matched_sheet, member_name, text):
-            return jsonify({"message": f"{member_name}님의 {matched_sheet} 저장이 완료되었습니다."})
-        else:
-            return jsonify({"message": f"같은 내용이 이미 '{matched_sheet}' 시트에 저장되어 있습니다."})
+            return jsonify({"message": "저장할 시트를 찾을 수 없습니다."})
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+        
 
 
 
