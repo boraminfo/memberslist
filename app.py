@@ -127,7 +127,7 @@ def get_worksheet(sheet_name):
         if not sheet_title:
             raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
         sheet = client.open(sheet_title)
-        
+
 
 
         return sheet.worksheet(sheet_name)
@@ -724,6 +724,7 @@ def debug_sheets():
 
 
 
+print("[디버그] GOOGLE_SHEET_TITLE =", os.getenv("GOOGLE_SHEET_TITLE"))
 
 
 
