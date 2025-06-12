@@ -11,18 +11,16 @@ from gspread.utils import rowcol_to_a1
 from datetime import datetime
 from collections import Counter
 
-
-
-
-
-
 load_dotenv()  # 꼭 먼저 실행돼야 함
-print("TEST_VARIABLE =", os.getenv("TEST_VARIABLE"))
+
+
+
+
+
 
 
 
 # ✅ 환경 변수 로드
-load_dotenv()
 app = Flask(__name__)
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
@@ -134,6 +132,14 @@ def get_worksheet(sheet_name):
     except Exception as e:
         print(f"[시트 접근 오류] {e}")
         return None
+
+
+
+
+
+print("TEST_VARIABLE =", os.getenv("TEST_VARIABLE"))
+print("GOOGLE_SHEET_TITLE =", os.getenv("GOOGLE_SHEET_TITLE"))
+
 
 
 
@@ -724,7 +730,7 @@ def debug_sheets():
 
 
 
-print("[디버그] GOOGLE_SHEET_TITLE =", os.getenv("GOOGLE_SHEET_TITLE"))
+
 
 
 
