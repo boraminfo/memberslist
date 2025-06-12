@@ -5,7 +5,8 @@ import pandas as pd
 import gspread
 import pytz
 from flask import Flask, request, jsonify
-from oauth2client.service_account import ServiceAccountCredentials
+from google.oauth2.service_account import Credentials
+
 from dotenv import load_dotenv
 from gspread.utils import rowcol_to_a1
 from datetime import datetime
@@ -154,17 +155,30 @@ def get_worksheet(sheet_name):
     try:
         keyfile_dict = json.loads(os.getenv("GOOGLE_SHEET_KEY"))
         keyfile_dict["private_key"] = keyfile_dict["private_key"].replace("\\n", "\n")
-        scope = [
-            "https://spreadsheets.google.com/feeds",
+
+        scopes = [
+            "https://www.googleapis.com/auth/spreadsheets",
             "https://www.googleapis.com/auth/drive"
         ]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
-        client = gspread.authorize(creds)
-        sheet = client.open(GOOGLE_SHEET_TITLE)  # ✅ 시트명 환경변수로 교체
+        credentials = Credentials.from_service_account_info(keyfile_dict, scopes=scopes)
+        gc = gspread.authorize(credentials)
+
+        sheet = gc.open(GOOGLE_SHEET_TITLE)  # ✅ 시트명 환경변수로 지정
         return sheet.worksheet(sheet_name)
+
+
     except Exception as e:
         print(f"[시트 접근 오류] {e}")
         return None
+
+
+
+
+
+
+
+
+
 
 
 
@@ -737,24 +751,90 @@ def search_memo_by_tags():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 # ✅ 제품주문 시트
+
+# ✅ 인증 처리
+# ✅ Google Sheets 연동 함수
+
+
+# ✅ 주문내역 시트 가져오기
+sheet = get_worksheet("제품주문")
+
+# ✅ 주문 데이터 추가 함수
+def insert_order_row(sheet, order_data):
+    row = [
+        order_data.get('회원명', ''),
+        order_data.get('주문일자', datetime.today().strftime('%Y-%m-%d')),
+        order_data.get('제품명', ''),
+        order_data.get('제품가격', ''),
+        order_data.get('PV', ''),
+        order_data.get('결재방법', ''),
+        order_data.get('주문자_고객명', ''),
+        order_data.get('주문자_휴대폰번호', ''),
+        order_data.get('배송처', ''),
+        order_data.get('수령확인', ''),
+    ]
+    sheet.append_row(row)
+
+# ✅ 사용 예시
+data = {
+    '회원명': '이태수',
+    '제품명': '칫솔 1통',
+    '제품가격': 9600,
+    'PV': 4800,
+    '결재방법': '카드',
+    '주문자_고객명': '박태수'
+}
+
+if sheet:
+    insert_order_row(sheet, data)
+
+
+
+
+
 
 # ✅ 주문일자 자동 처리 함수
 def process_order_date(value):
     if value.strip() == "":
         return datetime.now().strftime("%Y-%m-%d")
     return value.strip()
+
+# ✅ 공통 주문 저장 함수
+def handle_order_save(data):
+    sheet = get_worksheet("제품주문")
+    if not sheet:
+        raise Exception("제품주문 시트를 찾을 수 없습니다.")
+
+    order_date = process_order_date(data.get("주문일자", ""))
+    row = [
+        order_date,
+        data.get("회원명", ""),
+        data.get("회원번호", ""),
+        data.get("휴대폰번호", ""),
+        data.get("제품명", ""),
+        float(data.get("제품가격", 0)),
+        float(data.get("PV", 0)),
+        data.get("결재방법", ""),
+        data.get("주문자_고객명", ""),
+        data.get("주문자_휴대폰번호", ""),
+        data.get("배송처", ""),
+        data.get("수령확인", "")
+    ]
+
+    if not sheet.get_all_values():
+        headers = [
+            "주문일자", "회원명", "회원번호", "휴대폰번호",
+            "제품명", "제품가격", "PV", "결재방법",
+            "주문자_고객명", "주문자_휴대폰번호", "배송처", "수령확인"
+        ]
+        sheet.append_row(headers)
+
+    sheet.insert_row(row, index=2)
+
+
+
+
 
 # ✅ 제품 주문 등록 API
 @app.route("/add_order", methods=["POST"])
@@ -803,8 +883,10 @@ def add_order():
 
         # ✅ 2행(최신)으로 삽입
         order_sheet.insert_row(row, index=2)
-
+        
+        handle_order_save(data)
         return jsonify({"message": "제품주문이 저장되었습니다."}), 200
+        
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -819,20 +901,41 @@ def add_order():
 
 # ✅ 주문 저장 API
 @app.route("/save_order", methods=["POST"])
-def save_order():
-    try:
-        raw_data = request.get_json()
-        if not raw_data:
-            return jsonify({"error": "주문 데이터를 입력해 주세요."}), 400
+def save_order(
+    회원명, 제품명, 제품가격, PV,
+    주문자_고객명=None,
+    주문자_휴대폰번호=None,
+    주문일자=None,
+    결재방법="카드",
+    배송처=None,
+    수령확인="0",
+    endpoint="https://memberslist.onrender.com/add_order"
+):
+    if 주문일자 is None:
+        주문일자 = datetime.date.today().isoformat()
 
-        order_data = normalize_order_fields(raw_data)
-        insert_order_row(order_data)
+    data = {
+        "회원명": 회원명,
+        "주문일자": 주문일자,
+        "제품명": 제품명,
+        "제품가격": 제품가격,
+        "PV": PV,
+        "결재방법": 결재방법,
+        "주문자_고객명": 주문자_고객명,
+        "주문자_휴대폰번호": 주문자_휴대폰번호,
+        "배송처": 배송처,
+        "수령확인": 수령확인
+    }
 
-        return jsonify({"status": "success", "message": "주문이 저장되었습니다."}), 200
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+    response = requests.post(endpoint, json=data)
+
+    if response.status_code == 200:
+        print("✅ 주문 저장 성공:", response.json())
+        return response.json()
+    else:
+        print("❌ 주문 저장 실패:", response.status_code, response.text)
+        return None
+
     
 
 
