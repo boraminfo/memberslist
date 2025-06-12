@@ -481,13 +481,16 @@ HEADERS = {"Content-Type": "application/json"}
 
 def determine_mode(content: str) -> str:
     if "상담일지" in content:
-        return "1"  # 상담일지 (공유)
-    elif "개인메모" in content:
-        return "개인"
+        return "1"  # 상담일지
+    elif "개인일지" in content:
+        return "2"  # 개인일지
     elif "활동일지" in content:
         return "3"
     else:
-        return "1"  # 기본값
+        return "1"
+
+
+
 
 @app.route('/save_note', methods=['POST'])
 def save_note():
@@ -506,6 +509,8 @@ def save_note():
         return jsonify({"status": "success", "message": "저장 완료"})
     else:
         return jsonify({"status": "error", "message": response.text})
+
+
         
 
 
@@ -544,7 +549,7 @@ def add_counseling():
         data = request.get_json()
         text = data.get("요청문", "")
 
-        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
+        sheet_keywords = ["상담일지", "개인일지", "활동일지", "직접입력"]
         action_keywords = ["저장", "기록", "입력"]
 
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
@@ -562,7 +567,7 @@ def add_counseling():
             text = text.replace(kw, "")
         text = text.strip()
 
-        if matched_sheet not in ["상담일지", "개인메모", "활동일지"]:
+        if matched_sheet not in ["상담일지", "개인일지", "활동일지"]:
             return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
 
         if save_to_sheet(matched_sheet, member_name, text):
