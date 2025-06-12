@@ -12,13 +12,33 @@ from datetime import datetime
 from collections import Counter
 
 
-
-
 # ✅ 환경 변수 로드
-load_dotenv()
+# ✅ .env 경로 명시적 지정 및 로드
+dotenv_path = os.path.abspath(".env")
+if not os.path.exists(dotenv_path):
+    raise FileNotFoundError(f".env 파일이 존재하지 않습니다: {dotenv_path}")
+
+load_dotenv(dotenv_path)
+
+print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
+print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
+
+
+
+
+
+GOOGLE_SHEET_TITLE = os.getenv("GOOGLE_SHEET_TITLE")  # ✅ 시트명 불러오기
+
+
+
+
+
 app = Flask(__name__)
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
+if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
+    raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+
 
 
 
@@ -112,7 +132,7 @@ def get_worksheet(sheet_name):
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)
-        sheet = client.open("members_list_main")
+        sheet = client.open(GOOGLE_SHEET_TITLE)  # ✅ 시트명 환경변수로 교체
         return sheet.worksheet(sheet_name)
     except Exception as e:
         print(f"[시트 접근 오류] {e}")
@@ -678,7 +698,7 @@ def debug_sheets():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)  # ✅ 이 줄 추가
-        sheet = client.open("members_list_main")
+        sheet = client.open(GOOGLE_SHEET_TITLE)  # ✅ 환경변수로 변경
         titles = [ws.title for ws in sheet.worksheets()]
         return jsonify({"시트목록": titles})
     except Exception as e:
