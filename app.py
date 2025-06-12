@@ -566,6 +566,9 @@ def add_counseling():
             text = text.replace(f"{member_name} {kw}", "")
             text = text.replace(kw, "")
         text = text.strip()
+        # 앞에 붙은 콜론(: 또는 ：) 제거
+        text = re.sub(r'^[:：]\s*', '', text)
+
 
         if matched_sheet not in ["상담일지", "개인메모", "활동일지"]:
             return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
