@@ -766,7 +766,8 @@ def add_order():
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
         # ✅ 회원 정보 확인
-        sheet = get_sheet()
+        sheet = get_member_sheet()
+
         records = sheet.get_all_records()
         member_info = next((r for r in records if r.get("회원명") == member_name), None)
         if not member_info:
