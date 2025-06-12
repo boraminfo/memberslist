@@ -730,3 +730,30 @@ def debug_sheets():
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
     
+
+
+
+
+
+def get_worksheet(sheet_name):
+    try:
+        ...
+        return sheet.worksheet(sheet_name)
+    except Exception as e:
+        print(f"[시트 접근 오류: {sheet_name}] {e}")
+        return None
+
+@app.route("/debug_sheets")
+def debug_sheets():
+    try:
+        keyfile_dict = json.loads(os.getenv("GOOGLE_SHEET_KEY"))
+        keyfile_dict["private_key"] = keyfile_dict["private_key"].replace("\\n", "\n")
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
+        client = gspread.authorize(creds)
+        sheet = client.open(GOOGLE_SHEET_TITLE)
+        titles = [ws.title for ws in sheet.worksheets()]
+        return jsonify({"시트목록": titles})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
