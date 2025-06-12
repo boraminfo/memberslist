@@ -11,20 +11,14 @@ from gspread.utils import rowcol_to_a1
 from datetime import datetime
 from collections import Counter
 
-load_dotenv()  # 꼭 먼저 실행돼야 함
-
-
-
-
-
 
 
 
 # ✅ 환경 변수 로드
+load_dotenv()
 app = Flask(__name__)
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
-
 
 
 
@@ -90,7 +84,7 @@ def get_counseling_sheet():
     return get_worksheet("상담일지")
 
 def get_mymemo_sheet():
-    return get_worksheet("개인메모")
+    return get_worksheet("개인일지")
 
 def get_search_memo_by_tags_sheet():
     return get_worksheet("개인메모")
@@ -118,28 +112,11 @@ def get_worksheet(sheet_name):
         ]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)
-
-
-# 👉 환경변수에서 시트 제목 가져오기
-        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
-        if not sheet_title:
-            raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
-        sheet = client.open(sheet_title)
-
-
-
+        sheet = client.open("members_list_main")
         return sheet.worksheet(sheet_name)
     except Exception as e:
         print(f"[시트 접근 오류] {e}")
         return None
-
-
-
-
-
-print("TEST_VARIABLE =", os.getenv("TEST_VARIABLE"))
-print("GOOGLE_SHEET_TITLE =", os.getenv("GOOGLE_SHEET_TITLE"))
-
 
 
 
@@ -505,7 +482,7 @@ HEADERS = {"Content-Type": "application/json"}
 def determine_mode(content: str) -> str:
     if "상담일지" in content:
         return "1"  # 상담일지 (공유)
-    elif "개인메모" in content:
+    elif "개인일지" in content:
         return "개인"
     elif "활동일지" in content:
         return "3"
@@ -566,57 +543,37 @@ def add_counseling():
     try:
         data = request.get_json()
         text = data.get("요청문", "")
-        mode = data.get("mode", "1")
 
-        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
+        sheet_keywords = ["상담일지", "개인일지", "활동일지", "직접입력"]
         action_keywords = ["저장", "기록", "입력"]
 
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
-            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
+            return jsonify({"message": "저장하려면 '상담일지', '개인일지', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
-        # 정확한 회원명 추출
         match = re.search(r'([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력)', text)
         if not match:
             return jsonify({"message": "회원명을 인식할 수 없습니다."})
         member_name = match.group(1)
+        matched_sheet = match.group(2)
 
-        # 명령어 제거
         for kw in sheet_keywords + action_keywords:
             text = text.replace(f"{member_name}{kw}", "")
             text = text.replace(f"{member_name} {kw}", "")
             text = text.replace(kw, "")
         text = text.strip()
 
-        # mode 값에 따라 저장 대상 시트 결정
-        mode_map = {
-            "1": ["상담일지"],
-            "2": ["개인메모"],
-            "3": ["상담일지", "활동일지"],
-            "4": ["개인메모", "활동일지"],
-            "5": []
-        }
-        target_sheets = mode_map.get(mode, ["상담일지", "개인메모", "활동일지"])
+        if matched_sheet not in ["상담일지", "개인일지", "활동일지"]:
+            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
 
-        if not target_sheets:
-            return jsonify({"message": "저장이 취소되었습니다."})
-
-        saved = False
-        for sheet in target_sheets:
-            if save_to_sheet(sheet, member_name, text):
-                saved = True
-            else:
-                return jsonify({"message": f"같은 내용이 이미 '{sheet}' 시트에 저장되어 있습니다."})
-
-        if saved:
-            return jsonify({"message": f"{member_name}님의 상담일지 저장이 완료되었습니다."})
+        if save_to_sheet(matched_sheet, member_name, text):
+            return jsonify({"message": f"{member_name}님의 {matched_sheet} 저장이 완료되었습니다."})
         else:
-            return jsonify({"message": "저장할 시트를 찾을 수 없습니다."})
+            return jsonify({"message": f"같은 내용이 이미 '{matched_sheet}' 시트에 저장되어 있습니다."})
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
 
 
 
@@ -713,20 +670,11 @@ def debug_sheets():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)  # ✅ 이 줄 추가
-
-
-        # ✅ 환경변수에서 시트 이름 가져오기
-        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
-        if not sheet_title:
-            raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
-        sheet = client.open(sheet_title)
-
-
+        sheet = client.open("members_list_main")
         titles = [ws.title for ws in sheet.worksheets()]
         return jsonify({"시트목록": titles})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-
 
 
 
