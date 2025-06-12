@@ -763,8 +763,10 @@ sheet = get_worksheet("제품주문")
 # ✅ 주문 데이터 추가 함수
 def insert_order_row(sheet, order_data):
     row = [
-        order_data.get('회원명', ''),
         order_data.get('주문일자', datetime.today().strftime('%Y-%m-%d')),
+        order_data.get('회원명', ''),
+        order_data.get('회원번호', ''),
+        order_data.get('휴대폰번호', ''),
         order_data.get('제품명', ''),
         order_data.get('제품가격', ''),
         order_data.get('PV', ''),
@@ -772,9 +774,10 @@ def insert_order_row(sheet, order_data):
         order_data.get('주문자_고객명', ''),
         order_data.get('주문자_휴대폰번호', ''),
         order_data.get('배송처', ''),
-        order_data.get('수령확인', ''),
+        order_data.get('수령확인', '')
     ]
     sheet.append_row(row)
+
 
 # ✅ 사용 예시
 data = {
@@ -886,7 +889,7 @@ def add_order():
         
         handle_order_save(data)
         return jsonify({"message": "제품주문이 저장되었습니다."}), 200
-        
+
     except Exception as e:
         import traceback
         traceback.print_exc()
