@@ -13,15 +13,27 @@ from collections import Counter
 
 
 # ✅ 환경 변수 로드
-# ✅ .env 경로 명시적 지정 및 로드
-dotenv_path = os.path.abspath(".env")
-if not os.path.exists(dotenv_path):
-    raise FileNotFoundError(f".env 파일이 존재하지 않습니다: {dotenv_path}")
 
-load_dotenv(dotenv_path)
 
+if os.getenv("RENDER") is None:  # 로컬에서 실행 중일 때만
+    from dotenv import load_dotenv
+    dotenv_path = os.path.abspath('.env')
+    if not os.path.exists(dotenv_path):
+        raise FileNotFoundError(f".env 파일이 존재하지 않습니다: {dotenv_path}")
+    load_dotenv(dotenv_path)
+
+# 공통 처리
+GOOGLE_SHEET_KEY = os.getenv("GOOGLE_SHEET_KEY")
+GOOGLE_SHEET_TITLE = os.getenv("GOOGLE_SHEET_TITLE")
+
+
+
+
+# ✅ 확인용 출력 (선택)
 print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
+
+
 
 
 
