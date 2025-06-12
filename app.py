@@ -728,34 +728,7 @@ def search_memo_by_tags():
 
 
 
-def get_worksheet(sheet_name):
-    try:
-        ...
-        return sheet.worksheet(sheet_name)
-    except Exception as e:
-        print(f"[시트 접근 오류: {sheet_name}] {e}")
-        return None
 
-@app.route("/debug_sheets")
-def debug_sheets():
-    try:
-        keyfile_dict = json.loads(os.getenv("GOOGLE_SHEET_KEY"))
-        keyfile_dict["private_key"] = keyfile_dict["private_key"].replace("\\n", "\n")
-        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-        creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
-        client = gspread.authorize(creds)
-
-        sheet = client.open(GOOGLE_SHEET_TITLE)
-
-        # ✅ 디버깅용 로그 출력
-        print(f"[시트 객체] {sheet}")
-
-        titles = [ws.title for ws in sheet.worksheets()]
-        return jsonify({"시트목록": titles})
-    except Exception as e:
-        import traceback
-        traceback.print_exc()  # ✅ 자세한 에러 출력
-        return jsonify({"error": repr(e)}), 500
 
 
 
