@@ -544,6 +544,11 @@ def add_counseling():
         data = request.get_json()
         text = data.get("요청문", "")
 
+        # ✅ 시트 키워드 정규화 처리
+        text = text.replace("개인 메모", "개인메모")
+        text = text.replace("상담 일지", "상담일지")
+        text = text.replace("활동 일지", "활동일지")
+
         sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
         action_keywords = ["저장", "기록", "입력"]
 
