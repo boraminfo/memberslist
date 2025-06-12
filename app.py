@@ -751,9 +751,17 @@ def debug_sheets():
         scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         creds = ServiceAccountCredentials.from_json_keyfile_dict(keyfile_dict, scope)
         client = gspread.authorize(creds)
+
         sheet = client.open(GOOGLE_SHEET_TITLE)
+
+        # ✅ 디버깅용 로그 출력
+        print(f"[시트 객체] {sheet}")
+
         titles = [ws.title for ws in sheet.worksheets()]
         return jsonify({"시트목록": titles})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        import traceback
+        traceback.print_exc()  # ✅ 자세한 에러 출력
+        return jsonify({"error": repr(e)}), 500
+        
 
