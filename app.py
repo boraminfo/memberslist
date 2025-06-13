@@ -760,10 +760,23 @@ def search_memo_by_tags():
 # ✅ 주문내역 시트 가져오기
 sheet = get_worksheet("제품주문")
 
+
+# ✅ 주문일자 처리 함수 (먼저 정의되어야 함)
+def process_order_date(value):
+    try:
+        if not value or value.strip().startswith("="):
+            return datetime.now().strftime("%Y-%m-%d")
+        return value.strip()
+    except:
+        return datetime.now().strftime("%Y-%m-%d")
+
+
+
+
 # ✅ 주문 데이터 추가 함수
 def insert_order_row(sheet, order_data):
     row = [
-        order_data.get('주문일자', ''),  
+        process_order_date(order_data.get('주문일자', '')),  # ✅ 여기에 적용
         order_data.get('회원명', ''),
         order_data.get('회원번호', ''),
         order_data.get('휴대폰번호', ''),
@@ -778,14 +791,6 @@ def insert_order_row(sheet, order_data):
     ]
     sheet.append_row(row)
 
-# ✅ 주문일자 처리 함수 (수식 방지)
-def process_order_date(value):
-    try:
-        if not value or value.strip().startswith("="):
-            return datetime.now().strftime("%Y-%m-%d")
-        return value.strip()
-    except:
-        return datetime.now().strftime("%Y-%m-%d")
 
 
 # ✅ 사용 예시
@@ -806,11 +811,12 @@ if sheet:
 
 
 
-# ✅ 주문일자 자동 처리 함수
-def process_order_date(value):
-    if value.strip() == "":
-        return datetime.now().strftime("%Y-%m-%d")
-    return value.strip()
+
+
+
+
+
+
 
 # ✅ 공통 주문 저장 함수
 def handle_order_save(data):
