@@ -763,7 +763,7 @@ sheet = get_worksheet("제품주문")
 # ✅ 주문 데이터 추가 함수
 def insert_order_row(sheet, order_data):
     row = [
-        order_data.get('주문일자', datetime.today().strftime('%Y-%m-%d')),
+        order_data.get('주문일자', ''),  
         order_data.get('회원명', ''),
         order_data.get('회원번호', ''),
         order_data.get('휴대폰번호', ''),
@@ -777,6 +777,15 @@ def insert_order_row(sheet, order_data):
         order_data.get('수령확인', '')
     ]
     sheet.append_row(row)
+
+# ✅ 주문일자 처리 함수 (수식 방지)
+def process_order_date(value):
+    try:
+        if not value or value.strip().startswith("="):
+            return datetime.now().strftime("%Y-%m-%d")
+        return value.strip()
+    except:
+        return datetime.now().strftime("%Y-%m-%d")
 
 
 # ✅ 사용 예시
@@ -887,7 +896,7 @@ def add_order():
         # ✅ 2행(최신)으로 삽입
         order_sheet.insert_row(row, index=2)
         
-        handle_order_save(data)
+       
         return jsonify({"message": "제품주문이 저장되었습니다."}), 200
 
     except Exception as e:
