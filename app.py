@@ -764,6 +764,9 @@ sheet = get_worksheet("제품주문")
 # ✅ 주문일자 처리 함수 (먼저 정의되어야 함)
 # ✅ 주문일자 처리 함수 (수식 및 누락 방지)
 # ✅ 주문일자 처리 함수 (자연어 + 문자열 고정)
+from datetime import datetime, timedelta
+
+# ✅ 오늘 날짜를 실제 문자열로 반환하는 함수
 def process_order_date(raw_date: str) -> str:
     try:
         if not raw_date or raw_date.strip() == "":
@@ -778,6 +781,7 @@ def process_order_date(raw_date: str) -> str:
         elif "내일" in raw_date:
             return (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
 
+        # 날짜 형식 유효성 검사
         datetime.strptime(raw_date, "%Y-%m-%d")
         return raw_date
 
@@ -787,10 +791,11 @@ def process_order_date(raw_date: str) -> str:
 
 
 
+
 # ✅ 주문 데이터 추가 함수
 def insert_order_row(sheet, order_data):
     row = [
-        process_order_date(order_data.get('주문일자', '')),  # ✅ 여기에 적용
+        process_order_date(order_data.get('주문일자', '')),
         order_data.get('회원명', ''),
         order_data.get('회원번호', ''),
         order_data.get('휴대폰번호', ''),
@@ -804,6 +809,7 @@ def insert_order_row(sheet, order_data):
         order_data.get('수령확인', '')
     ]
     sheet.append_row(row)
+
 
 
 
