@@ -763,14 +763,26 @@ sheet = get_worksheet("제품주문")
 
 # ✅ 주문일자 처리 함수 (먼저 정의되어야 함)
 # ✅ 주문일자 처리 함수 (수식 및 누락 방지)
-def process_order_date(value):
+# ✅ 주문일자 처리 함수 (자연어 + 문자열 고정)
+def process_order_date(raw_date: str) -> str:
     try:
-        if not value or value.strip() == '' or value.strip().startswith('='):
+        if not raw_date or raw_date.strip() == "":
             return datetime.now().strftime('%Y-%m-%d')
-        return value.strip()
-    except:
-        return datetime.now().strftime('%Y-%m-%d')
 
+        raw_date = raw_date.strip()
+
+        if "오늘" in raw_date:
+            return datetime.now().strftime('%Y-%m-%d')
+        elif "어제" in raw_date:
+            return (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif "내일" in raw_date:
+            return (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+
+        datetime.strptime(raw_date, "%Y-%m-%d")
+        return raw_date
+
+    except Exception:
+        return datetime.now().strftime('%Y-%m-%d')
 
 
 
@@ -861,7 +873,7 @@ def handle_order_save(data):
             return
 
     sheet.insert_row(row, index=2)
-    
+
 
 
 
