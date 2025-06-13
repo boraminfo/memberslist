@@ -795,7 +795,7 @@ def process_order_date(raw_date: str) -> str:
 # ✅ 주문 데이터 추가 함수
 def insert_order_row(sheet, order_data):
     row = [
-        process_order_date(order_data.get('주문일자', '')),
+        process_order_date(data.get("주문일자", "")),
         order_data.get('회원명', ''),
         order_data.get('회원번호', ''),
         order_data.get('휴대폰번호', ''),
@@ -960,12 +960,11 @@ def save_order(
     수령확인="0",
     endpoint="https://memberslist.onrender.com/add_order"
 ):
-    if 주문일자 is None:
-        주문일자 = datetime.date.today().isoformat()
+
 
     data = {
         "회원명": 회원명,
-        "주문일자": 주문일자,
+        "주문일자": process_order_date(주문일자),  # ✅ 여기서 날짜 처리 통일
         "제품명": 제품명,
         "제품가격": 제품가격,
         "PV": PV,
@@ -1015,20 +1014,24 @@ def normalize_order_fields(data: dict) -> dict:
 
 # ✅ 주문일자 처리
 def process_order_date(raw_date: str) -> str:
-    if not raw_date or raw_date.strip() == "":
-        return "=TODAY()"
-    raw_date = raw_date.strip()
-    if "오늘" in raw_date:
-        return "=TODAY()"
-    elif "어제" in raw_date:
-        return "=TODAY()-1"
-    elif "내일" in raw_date:
-        return "=TODAY()+1"
     try:
+        if not raw_date or raw_date.strip() == "":
+            return datetime.now().strftime('%Y-%m-%d')
+
+        raw_date = raw_date.strip()
+
+        if "오늘" in raw_date:
+            return datetime.now().strftime('%Y-%m-%d')
+        elif "어제" in raw_date:
+            return (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif "내일" in raw_date:
+            return (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+
         datetime.strptime(raw_date, "%Y-%m-%d")
         return raw_date
-    except ValueError:
-        return "=TODAY()"
+    except Exception:
+        return datetime.now().strftime('%Y-%m-%d')
+
 
 
 
@@ -1148,6 +1151,8 @@ def delete_order_confirm():
 # 서버 실행
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
+
 
 
 
