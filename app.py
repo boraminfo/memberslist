@@ -762,13 +762,15 @@ sheet = get_worksheet("제품주문")
 
 
 # ✅ 주문일자 처리 함수 (먼저 정의되어야 함)
+# ✅ 주문일자 처리 함수 (수식 및 누락 방지)
 def process_order_date(value):
     try:
-        if not value or value.strip().startswith("="):
-            return datetime.now().strftime("%Y-%m-%d")
+        if not value or value.strip() == '' or value.strip().startswith('='):
+            return datetime.now().strftime('%Y-%m-%d')
         return value.strip()
     except:
-        return datetime.now().strftime("%Y-%m-%d")
+        return datetime.now().strftime('%Y-%m-%d')
+
 
 
 
@@ -819,6 +821,7 @@ if sheet:
 
 
 # ✅ 공통 주문 저장 함수
+# ✅ 주문 저장 함수
 def handle_order_save(data):
     sheet = get_worksheet("제품주문")
     if not sheet:
@@ -840,7 +843,8 @@ def handle_order_save(data):
         data.get("수령확인", "")
     ]
 
-    if not sheet.get_all_values():
+    values = sheet.get_all_values()
+    if not values:
         headers = [
             "주문일자", "회원명", "회원번호", "휴대폰번호",
             "제품명", "제품가격", "PV", "결재방법",
@@ -848,7 +852,16 @@ def handle_order_save(data):
         ]
         sheet.append_row(headers)
 
+    # 중복 방지 로직
+    for existing in values[1:]:
+        if (existing[0] == order_date and
+            existing[1] == data.get("회원명") and
+            existing[4] == data.get("제품명")):
+            print("⚠️ 이미 동일한 주문이 존재하여 저장하지 않음")
+            return
+
     sheet.insert_row(row, index=2)
+    
 
 
 
