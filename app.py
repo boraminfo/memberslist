@@ -430,22 +430,39 @@ def register_member():
     sheet.insert_row(new_row, 2)
     return jsonify({"message": f"{name} (회원번호 {number}) 등록 완료"}), 200
 
+
+
+   
+
+
+
 # ✅ JSON 기반 회원 저장/수정 API
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
+        # 1. 요청값 정리
         req_raw = request.get_json()
         req = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in req_raw.items()}
         name = req.get("회원명", "").strip()
         number = req.get("회원번호", "").strip().lower()
 
+        # 2. 회원번호가 누락된 경우, 회원명에서 자동 추출
+        if name and not number:
+            import re
+            match = re.match(r"(.*?)[\s\-]?(\d{7,})", name)
+            if match:
+                name, number = match.group(1).strip(), match.group(2).strip()
+
+        # 3. 이름이 여전히 없으면 오류 반환
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
+        # 4. 시트 데이터 준비
         sheet = get_member_sheet()
         data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
 
+        # 5. 신규 등록 처리
         if name and number:
             for i, row in enumerate(data):
                 if str(row.get("회원명", "")).strip() == name and str(row.get("회원번호", "")).strip().lower() == number:
@@ -456,8 +473,9 @@ def save_member():
                 if key in headers:
                     new_row[headers.index(key)] = value
             sheet.insert_row(new_row, 2)
-            return jsonify({"message": f"신규 회원 '{name}' 저장 완료"})
+            return jsonify({"message": f"{name} (회원번호 {number}) 등록 완료"})
 
+        # 6. 회원번호 없이 기존 이름만 있을 경우 수정 처리
         else:
             for i, row in enumerate(data):
                 if str(row.get("회원명", "")).strip() == name:
@@ -473,8 +491,7 @@ def save_member():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(debug=True)
+
 
 
 
