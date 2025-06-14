@@ -27,6 +27,9 @@ if os.getenv("RENDER") is None:  # 로컬에서 실행 중일 때만
 GOOGLE_SHEET_KEY = os.getenv("GOOGLE_SHEET_KEY")
 GOOGLE_SHEET_TITLE = os.getenv("GOOGLE_SHEET_TITLE")  # ✅ 시트명 불러오기
 
+# 한국 시간 가져오는 함수
+def now_kst():
+    return datetime.now(pytz.timezone("Asia/Seoul"))
 
 
 
@@ -770,23 +773,23 @@ from datetime import datetime, timedelta
 def process_order_date(raw_date: str) -> str:
     try:
         if not raw_date or raw_date.strip() == "":
-            return datetime.now().strftime('%Y-%m-%d')
+            return now_kst().strftime('%Y-%m-%d')
 
         raw_date = raw_date.strip()
 
         if "오늘" in raw_date:
-            return datetime.now().strftime('%Y-%m-%d')
+            return now_kst().strftime('%Y-%m-%d')
         elif "어제" in raw_date:
-            return (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+            return (now_kst() - timedelta(days=1)).strftime('%Y-%m-%d')
         elif "내일" in raw_date:
-            return (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+            return (now_kst() + timedelta(days=1)).strftime('%Y-%m-%d')
 
         # 날짜 형식 유효성 검사
         datetime.strptime(raw_date, "%Y-%m-%d")
         return raw_date
 
     except Exception:
-        return datetime.now().strftime('%Y-%m-%d')
+        return now_kst().strftime('%Y-%m-%d')
 
 
 
@@ -1016,21 +1019,21 @@ def normalize_order_fields(data: dict) -> dict:
 def process_order_date(raw_date: str) -> str:
     try:
         if not raw_date or raw_date.strip() == "":
-            return datetime.now().strftime('%Y-%m-%d')
+            return now_kst().strftime('%Y-%m-%d')
 
         raw_date = raw_date.strip()
 
         if "오늘" in raw_date:
-            return datetime.now().strftime('%Y-%m-%d')
+            return now_kst().strftime('%Y-%m-%d')
         elif "어제" in raw_date:
-            return (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+            return (now_kst() - timedelta(days=1)).strftime('%Y-%m-%d')
         elif "내일" in raw_date:
-            return (datetime.now() + timedelta(days=1)).strftime('%Y-%m-%d')
+            return (now_kst() + timedelta(days=1)).strftime('%Y-%m-%d')
 
         datetime.strptime(raw_date, "%Y-%m-%d")
         return raw_date
     except Exception:
-        return datetime.now().strftime('%Y-%m-%d')
+        return now_kst().strftime('%Y-%m-%d')
 
 
 
