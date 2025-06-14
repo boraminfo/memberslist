@@ -384,15 +384,10 @@ def update_member():
 
 
 
-# 🔌 Google Sheets 연결
+
+# ✅ 회원 시트 접근 함수
 def get_member_sheet():
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
-    return client.open("members_list_main").worksheet("DB")  # 실제 문서명/시트명으로 수정
-
-
-
+    return get_worksheet("DB")  # 시트 탭 이름에 맞게 수정
 
 # 예시 시트 함수 (실제 구현에 맞게 교체)
 
