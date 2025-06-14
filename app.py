@@ -4,14 +4,17 @@ import re
 import pandas as pd
 import gspread
 import pytz
+import uuid
 from flask import Flask, request, jsonify
 from google.oauth2.service_account import Credentials
-
 from dotenv import load_dotenv
 from gspread.utils import rowcol_to_a1
 from datetime import datetime
 from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
+
+
+
 
 # ✅ 환경 변수 로드
 
@@ -389,7 +392,34 @@ def update_member():
 def get_member_sheet():
     return get_worksheet("DB")  # 시트 탭 이름에 맞게 수정
 
+
+
+# ✅ 회원 등록 명령 파싱 함수
+def parse_registration(text):
+    import re
+    text = text.strip()
+
+    match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
+    if match:
+        return match.group(1).strip(), match.group(2).strip()
+
+    match = re.search(r"(.+?)\s+(\d{6,})", text)
+    if match and "등록" in text:
+        return match.group(1).strip(), match.group(2).strip()
+
+    match = re.search(r"(.+?)\s*등록", text)
+    if match:
+        return match.group(1).strip(), None
+
+    return None, None
+
+
+
+
+
+
 # 예시 시트 함수 (실제 구현에 맞게 교체)
+# ✅ 회원 등록 API
 @app.route("/register", methods=["POST"])
 def register_member():
     # 1. 요청 데이터 수신
@@ -407,19 +437,15 @@ def register_member():
     name, number = parse_registration(text)
     print("[2] 🔍 parse_registration 결과 → name:", name, ", number:", number)
 
-    # 2-1. 이름 정리: '등록' 단어 제거
-    if name:
-        name = name.replace("등록", "").strip()
-        print("[2] ✅ 이름 후처리 완료:", name)
-
-    # 3. 필수 체크 및 기본값 처리
+    # 3. 이름 필수 확인
     if not name:
         print("[3] ❌ 이름 추출 실패")
         return jsonify({"error": "이름 추출 실패"}), 400
 
+    # 3-1. 회원번호 기본값 처리 (UUID 일부 사용)
     if not number:
-        number = "99999999"
-        print("[3] ⚠️ 회원번호 없음 → 기본값 사용:", number)
+        number = str(uuid.uuid4())[:8]
+        print(f"[3] ⚠️ 회원번호 없음 → UUID 기반 기본값 사용: {number}")
     else:
         print("[3] ✅ 회원번호:", number)
 
@@ -435,7 +461,7 @@ def register_member():
     headers = sheet.row_values(1)
     print("[4] ✅ 시트 헤더:", headers)
 
-    # 5. 기존 회원 덮어쓰기 또는 신규 추가
+    # 5. 기존 회원 덮어쓰기
     for i, row in enumerate(data_rows):
         if row.get("회원명") == name:
             print(f"[5] ⚠️ 기존 회원 '{name}' 발견 → 덮어쓰기")
@@ -444,15 +470,19 @@ def register_member():
                     sheet.update_cell(i + 2, headers.index(key) + 1, value)
             return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"})
 
-    # 신규 등록
+    # 6. 신규 등록
     print(f"[5] 🆕 신규 회원 '{name}' 등록")
     new_row = [''] * len(headers)
     for key, value in {"회원명": name, "회원번호": number}.items():
-        if key in headers:
-            new_row[headers.index(key)] = value
+        try:
+            col_idx = headers.index(key)
+            new_row[col_idx] = value
+        except ValueError:
+            print(f"[5] ⚠️ '{key}' 컬럼이 시트에 없어 무시됨")
 
     sheet.append_row(new_row)
     return jsonify({"message": f"{name} 회원 등록 완료"})
+
 
 
 
