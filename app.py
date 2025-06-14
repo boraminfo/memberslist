@@ -469,9 +469,20 @@ def save_member():
                     return jsonify({"message": f"이미 등록된 회원 '{name}' 입니다."})
 
             new_row = [''] * len(headers)
+
+            # ✅ 파싱된 name, number 반영
+            if "회원명" in headers:
+                new_row[headers.index("회원명")] = name
+            if "회원번호" in headers:
+                new_row[headers.index("회원번호")] = number
+
+            # ✅ 나머지 입력 필드는 중복 방지 후 반영
             for key, value in req.items():
-                if key in headers:
+                if key in headers and key not in ["회원명", "회원번호"]:
                     new_row[headers.index(key)] = value
+
+
+                    
             sheet.insert_row(new_row, 2)
             return jsonify({"message": f"{name} (회원번호 {number}) 등록 완료"})
 
