@@ -426,6 +426,8 @@ def register_member():
     match_full = re.match(r"(.+?)\s*회원번호\s*(\d+)\s*등록", text)
     match_alt = re.match(r"(.+?)\s+(\d{5,})\s*등록", text)
     match_name_only = re.match(r"([가-힣]{2,4})\s*등록", text)
+    match_name_only = re.search(
+        r"([가-힣]{2,4})(?:님|을|를|이라는|이란|이라는\s+사람)?\s*(회원)?\s*(으로)?\s*등록", text)
 
     if match_full:
         name, number = match_full.group(1).strip(), match_full.group(2).strip()
