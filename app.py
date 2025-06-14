@@ -384,7 +384,15 @@ def update_member():
 
 
 
-
+# 🔌 Google Sheets 연결
+def get_member_sheet():
+    scope = [
+        "https://spreadsheets.google.com/feeds",
+        "https://www.googleapis.com/auth/drive"
+    ]
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    client = gspread.authorize(creds)
+    return client.open("members_list_main").worksheet("DB")  # <- 시트 이름에 맞게 수정하세요
 
 
 
