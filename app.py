@@ -38,25 +38,11 @@ print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
 
 
-
-
-
-
-
-
-
-
-
-
-
 app = Flask(__name__)
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
 if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
     raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
-
-
-
 
 
 # 자연어 명령 키워드 매핑
@@ -103,7 +89,6 @@ def parse_request(text):
 def home():
     return "Flask 서버가 실행 중입니다."
 
-
 def get_db_sheet():
     return get_worksheet("DB")
 
@@ -124,7 +109,6 @@ def get_delete_order_request_sheet():
 
 def get_delete_order_confirm_sheet():
     return get_worksheet("제품주문")
-
 
 def get_ss_sheet():
     return get_worksheet("후원수당")
@@ -176,24 +160,12 @@ def get_worksheet(sheet_name):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 # ✅ 필드 키워드 → 시트의 실제 컬럼명 매핑
 field_map = {
     "휴대폰번호": "휴대폰번호",
     "핸드폰": "휴대폰번호",
     "주소": "주소",
-    "이메일": "이메일",
+    "회원번호": "회원번호",
     "이름": "회원명",
     "생일": "생년월일",
     "생년월일": "생년월일",
@@ -265,6 +237,7 @@ def find_member():
 field_map = {
     "휴대폰번호": "휴대폰번호",
     "핸드폰": "휴대폰번호",
+    "회원번호": "회원번호",
     "주소": "주소",
     "이메일": "이메일",
     "이름": "회원명",
@@ -399,7 +372,38 @@ def update_member():
         return jsonify({"error": str(e)}), 500
 
 
-    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -416,28 +420,48 @@ def parse_registration(text):
 @app.route("/register", methods=["POST"])
 def register_member():
     data = request.json
-    text = data.get("text", "")
-    name, number = parse_registration(text)
+    text = data.get("text", "").strip()
 
-    if not name or not number:
-        return jsonify({"error": "등록 형식을 인식할 수 없습니다. '홍길동 12345678 등록' 또는 '홍길동 회원번호 12345678 등록' 형식을 사용하세요."}), 400
+    # 1. 이름 + 회원번호 추출
+    name_number_match = re.match(r"(.+?)\\s*회원번호\\s*(\\d+)\\s*등록", text)
+    alt_match = re.match(r"(.+?)\\s+(\\d{5,})\\s*등록", text)
+
+    if name_number_match:
+        name, number = name_number_match.group(1).strip(), name_number_match.group(2).strip()
+    elif alt_match:
+        name, number = alt_match.group(1).strip(), alt_match.group(2).strip()
+    else:
+        # 2. 이름만 있는 등록 요청: "홍길동 등록"
+        name_only_match = re.match(r"([가-힣]{2,4})\\s*등록", text)
+        name, number = (name_only_match.group(1).strip(), "") if name_only_match else (None, None)
+
+    if not name:
+        return jsonify({"error": "등록 형식을 인식할 수 없습니다. 예) '홍길동 등록' 또는 '홍길동 회원번호 12345678 등록'"}), 400
 
     sheet = get_member_sheet()
     data_rows = sheet.get_all_records()
     headers = [h.strip() for h in sheet.row_values(1)]
 
+    # 중복 검사
     for row in data_rows:
-        if str(row.get("회원명", "")).strip() == name and str(row.get("회원번호", "")).strip() == number:
-            return jsonify({"message": f"이미 등록된 회원 '{name}'입니다."})
+        if str(row.get("회원명", "")).strip() == name:
+            return jsonify({"message": f"이미 등록된 회원 '{name}'입니다."}), 200
 
     new_row = [''] * len(headers)
     if "회원명" in headers:
         new_row[headers.index("회원명")] = name
-    if "회원번호" in headers:
+    if "회원번호" in headers and number:
         new_row[headers.index("회원번호")] = number
 
     sheet.insert_row(new_row, 2)
-    return jsonify({"message": f"{name} (회원번호 {number}) 등록 완료"}), 200
+    message = f"{name} 회원 등록 완료"
+    if number:
+        message += f" (회원번호 {number})"
+    return jsonify({"message": message}), 200
+
+
+
+
 
 
 
@@ -545,7 +569,7 @@ def delete_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-        
+
 
 
 
