@@ -393,56 +393,62 @@ def get_member_sheet():
 
 
 @app.route("/register", methods=["POST"])
+@app.route("/register", methods=["POST"])
 def register_member():
     # 1. 요청 데이터 수신
     data = request.get_json()
     print("\n[1] ✅ 요청 데이터 수신:", data)
 
-    # 1-1. text 키 존재 여부 확인
+    # 1-1. text 키 확인
     text = data.get("text", "")
     if not text:
-        print("[1] ❌ 'text' 키가 요청 JSON에 없습니다.")
+        print("[1] ❌ 'text' 키 없음")
         return jsonify({"error": "'text' 키가 없습니다."}), 400
 
     print("[1] ✅ text 내용:", text)
 
-    # 2. 정규식으로 이름/회원번호 추출
+    # 2. 이름 / 회원번호 추출
     name, number = parse_registration(text)
     print("[2] 🔍 parse_registration 결과 → name:", name, ", number:", number)
 
-    # 3. fallback 처리: 회원번호가 없으면 기본값으로 처리
-    if not number:
-        number = "99999999"  # 예시 기본값, 필요시 UUID 등으로 대체 가능
-        print("[3] ⚠️ 회원번호가 없어 기본값으로 대체:", number)
-    else:
-        print("[3] ✅ 회원번호 추출 성공:", number)
+    # 2-1. 이름에 "등록" 들어있으면 제거
+    if name and "등록" in name:
+        name = name.replace("등록", "").strip()
+        print("[2] ✅ 이름에서 '등록' 제거됨:", name)
 
+    # 3. 필수값 체크 및 기본값 처리
     if not name:
-        print("[3] ❌ 이름이 없어서 등록 중단")
+        print("[3] ❌ 이름 추출 실패")
         return jsonify({"error": "이름 추출 실패"}), 400
 
-    # 4. 시트 열기 및 등록 처리
+    if not number:
+        number = "99999999"
+        print("[3] ⚠️ 회원번호 없음 → 기본값 부여:", number)
+    else:
+        print("[3] ✅ 회원번호 추출됨:", number)
+
+    # 4. 시트 접근
     try:
         sheet = get_member_sheet()
         print("[4] ✅ DB 시트 접근 성공")
     except Exception as e:
-        print("[4] ❌ DB 시트 접근 실패:", str(e))
+        print("[4] ❌ 시트 접근 실패:", str(e))
         return jsonify({"error": "시트 접근 실패"}), 500
 
     data_rows = sheet.get_all_records()
     headers = sheet.row_values(1)
     print("[4] ✅ 시트 헤더:", headers)
 
-    # 5. 기존 회원 확인 후 덮어쓰기 or 신규 추가
+    # 5. 기존 회원 덮어쓰기
     for i, row in enumerate(data_rows):
         if row.get("회원명") == name:
-            print(f"[5] ⚠️ 기존 회원 '{name}' 발견 → 덮어쓰기 진행")
+            print(f"[5] ⚠️ 기존 회원 '{name}' → 덮어쓰기")
             for key, value in {"회원명": name, "회원번호": number}.items():
                 if key in headers:
                     sheet.update_cell(i + 2, headers.index(key) + 1, value)
             return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"})
 
-    # 신규 회원 등록
+    # 6. 신규 회원 등록
     print(f"[5] 🆕 신규 회원 '{name}' 등록")
     new_row = [''] * len(headers)
     for key, value in {"회원명": name, "회원번호": number}.items():
@@ -451,6 +457,7 @@ def register_member():
 
     sheet.append_row(new_row)
     return jsonify({"message": f"{name} 회원 등록 완료"})
+
 
 
 
