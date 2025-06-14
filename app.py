@@ -407,7 +407,7 @@ def update_member():
 
 
 
-# ✅ 자연어 회원 등록 구문 파싱
+# ✅ 자연어 회원 등록 구문 파싱(신규회원등록)
 def parse_registration(text):
     match = re.match(r"(.+?)\s*회원번호\s*(\d+)\s*등록", text)
     if not match:
@@ -478,62 +478,52 @@ def save_member():
         req = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in req_raw.items()}
         name = req.get("회원명", "").strip()
         number = req.get("회원번호", "").strip().lower()
+        요청문_raw = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
 
-        # 2. 회원번호가 누락된 경우, 회원명에서 자동 추출
-        if name and not number:
-            import re
-            match = re.match(r"(.*?)[\s\-]?(\d{7,})", name)
-            if match:
-                name, number = match.group(1).strip(), match.group(2).strip()
-
-        # 3. 이름이 여전히 없으면 오류 반환
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
-        # 4. 시트 데이터 준비
+        # 2. 시트 데이터 준비
         sheet = get_member_sheet()
         data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
 
-        # 5. 신규 등록 처리
-        if name and number:
-            for i, row in enumerate(data):
-                if str(row.get("회원명", "")).strip() == name and str(row.get("회원번호", "")).strip().lower() == number:
-                    return jsonify({"message": f"이미 등록된 회원 '{name}' 입니다."})
+        # 3. 기존 회원 여부 확인
+        for i, row in enumerate(data):
+            if str(row.get("회원명", "")).strip() == name:
+                요약정보 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
+                return jsonify({
+                    "message": f"이미 등록된 회원 '{name}'입니다.",
+                    "회원정보": 요약정보
+                }), 200
 
+        # 4. 등록 문구 포함 여부 확인
+        등록요청여부 = "등록" in 요청문_raw or "등록" in name
+
+        if 등록요청여부:
             new_row = [''] * len(headers)
-
-            # ✅ 파싱된 name, number 반영
             if "회원명" in headers:
                 new_row[headers.index("회원명")] = name
-            if "회원번호" in headers:
+            if "회원번호" in headers and number:
                 new_row[headers.index("회원번호")] = number
-
-            # ✅ 나머지 입력 필드는 중복 방지 후 반영
             for key, value in req.items():
                 if key in headers and key not in ["회원명", "회원번호"]:
                     new_row[headers.index(key)] = value
 
-
-                    
             sheet.insert_row(new_row, 2)
-            return jsonify({"message": f"{name} (회원번호 {number}) 등록 완료"})
-
-        # 6. 회원번호 없이 기존 이름만 있을 경우 수정 처리
+            return jsonify({
+                "message": f"{name} 회원 신규 등록 완료" + (f" (회원번호 {number})" if number else "")
+            }), 200
         else:
-            for i, row in enumerate(data):
-                if str(row.get("회원명", "")).strip() == name:
-                    for key, value in req.items():
-                        if key in headers:
-                            sheet.update_cell(i + 2, headers.index(key) + 1, value)
-                    return jsonify({"message": f"기존 회원 '{name}' 정보 수정 완료"})
-
-            return jsonify({"error": f"회원 '{name}' 정보를 찾을 수 없습니다. 회원번호와 함께 입력하면 신규등록됩니다."}), 404
+            return jsonify({
+                "message": f"'{name}' 회원은 등록되지 않았습니다. '등록' 문구가 포함되어야 합니다."
+            }), 400
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
