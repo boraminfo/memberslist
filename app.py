@@ -399,36 +399,52 @@ def update_member():
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
-        req = request.get_json()
-        name = req.get("회원명")
+        req_raw = request.get_json()
+
+        # ✅ 입력값 정리 (공백 제거)
+        req = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in req_raw.items()}
+        name = req.get("회원명", "").strip()
+        number = req.get("회원번호", "").strip().lower()  # 대소문자 구분 없애기
+
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
-        sheet = get_member_sheet()  # ✅ 수정된 부분
+        sheet = get_member_sheet()
         data = sheet.get_all_records()
-        headers = sheet.row_values(1)
+        headers = [h.strip() for h in sheet.row_values(1)]
 
-        # 기존 회원이 있으면 덮어쓰기
-        for i, row in enumerate(data):
-            if row.get('회원명') == name:
-                for key, value in req.items():
-                    if key in headers:
-                        sheet.update_cell(i + 2, headers.index(key) + 1, value)
-                return jsonify({"message": f"기존 회원 '{name}' 정보 수정 완료"})
+        # ✅ 회원명 + 회원번호 모두 있으면 → 신규등록 루틴
+        if name and number:
+            for i, row in enumerate(data):
+                row_name = str(row.get("회원명", "")).strip()
+                row_number = str(row.get("회원번호", "")).strip().lower()
+                if row_name == name and row_number == number:
+                    return jsonify({"message": f"이미 등록된 회원 '{name}' 입니다."})
 
-        # 신규 회원이면 추가
-        new_row = [''] * len(headers)
-        for key, value in req.items():
-            if key in headers:
-                new_row[headers.index(key)] = value
-   
-        sheet.insert_row(new_row, 2)
-        return jsonify({"message": f"신규 회원 '{name}' 저장 완료"})
+            # 신규 저장
+            new_row = [''] * len(headers)
+            for key, value in req.items():
+                if key in headers:
+                    new_row[headers.index(key)] = value
+            sheet.insert_row(new_row, 2)
+            return jsonify({"message": f"신규 회원 '{name}' 저장 완료"})
+
+        # ✅ 회원명만 있을 경우 → 기존 수정 루틴
+        else:
+            for i, row in enumerate(data):
+                row_name = str(row.get("회원명", "")).strip()
+                if row_name == name:
+                    for key, value in req.items():
+                        if key in headers:
+                            sheet.update_cell(i + 2, headers.index(key) + 1, value)
+                    return jsonify({"message": f"기존 회원 '{name}' 정보 수정 완료"})
+            return jsonify({"error": f"회원 '{name}' 정보를 찾을 수 없습니다. 회원번호와 함께 입력하면 신규등록됩니다."}), 404
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
