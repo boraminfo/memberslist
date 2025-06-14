@@ -422,27 +422,27 @@ def register_member():
     data = request.json
     text = data.get("text", "").strip()
 
-    # 1. 이름 + 회원번호 추출
-    name_number_match = re.match(r"(.+?)\\s*회원번호\\s*(\\d+)\\s*등록", text)
-    alt_match = re.match(r"(.+?)\\s+(\\d{5,})\\s*등록", text)
+    # 패턴: 이름 + 회원번호
+    match_full = re.match(r"(.+?)\s*회원번호\s*(\d+)\s*등록", text)
+    match_alt = re.match(r"(.+?)\s+(\d{5,})\s*등록", text)
+    match_name_only = re.match(r"([가-힣]{2,4})\s*등록", text)
 
-    if name_number_match:
-        name, number = name_number_match.group(1).strip(), name_number_match.group(2).strip()
-    elif alt_match:
-        name, number = alt_match.group(1).strip(), alt_match.group(2).strip()
+    if match_full:
+        name, number = match_full.group(1).strip(), match_full.group(2).strip()
+    elif match_alt:
+        name, number = match_alt.group(1).strip(), match_alt.group(2).strip()
+    elif match_name_only:
+        name, number = match_name_only.group(1).strip(), ""
     else:
-        # 2. 이름만 있는 등록 요청: "홍길동 등록"
-        name_only_match = re.match(r"([가-힣]{2,4})\\s*등록", text)
-        name, number = (name_only_match.group(1).strip(), "") if name_only_match else (None, None)
+        return jsonify({
+            "error": "등록 형식을 인식할 수 없습니다. 예) '홍길동 등록' 또는 '홍길동 회원번호 12345678 등록'"
+        }), 400
 
-    if not name:
-        return jsonify({"error": "등록 형식을 인식할 수 없습니다. 예) '홍길동 등록' 또는 '홍길동 회원번호 12345678 등록'"}), 400
-
+    # 시트 연결
     sheet = get_member_sheet()
     data_rows = sheet.get_all_records()
     headers = [h.strip() for h in sheet.row_values(1)]
 
-    # 중복 검사
     for row in data_rows:
         if str(row.get("회원명", "")).strip() == name:
             return jsonify({"message": f"이미 등록된 회원 '{name}'입니다."}), 200
