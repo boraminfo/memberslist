@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from gspread.utils import rowcol_to_a1
 from datetime import datetime
 from collections import Counter
-
+from oauth2client.service_account import ServiceAccountCredentials
 
 # ✅ 환경 변수 로드
 
@@ -386,21 +386,16 @@ def update_member():
 
 # 🔌 Google Sheets 연결
 def get_member_sheet():
-    scope = [
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ]
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     client = gspread.authorize(creds)
-    return client.open("members_list_main").worksheet("DB")  # <- 시트 이름에 맞게 수정하세요
+    return client.open("members_list_main").worksheet("DB")  # 실제 문서명/시트명으로 수정
 
 
 
 
 # 예시 시트 함수 (실제 구현에 맞게 교체)
-def get_member_sheet():
-    from some_module import connect_sheet
-    return connect_sheet()
+
 
 @app.route("/register", methods=["POST"])
 def register_member():
