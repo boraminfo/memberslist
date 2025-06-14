@@ -281,8 +281,13 @@ field_map = {
 def parse_request_and_update(data: str, member: dict) -> tuple:
     수정된필드 = {}
 
-    for keyword in sorted(field_map.keys(), key=lambda k: -len(k)):  # 긴 키워드 우선
-        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=\s+(?:{'|'.join(field_map.keys())})(?:를|은|는|이|:|：)|$)"
+# 정렬: 긴 키워드 우선
+    for keyword in sorted(field_map.keys(), key=lambda k: -len(k)):
+        # 다음 키워드 목록 준비
+        keywords_pattern = '|'.join(sorted(field_map.keys(), key=lambda k: -len(k)))
+        # 핵심 정규식: 현재 keyword → 다음 keyword 또는 문장 끝 전까지 추출
+        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=\s+(?:{keywords_pattern})(?:를|은|는|이|:|：)?|\s*$)"
+        matches = re.finditer(pattern, data)
 
 
         matches = re.finditer(pattern, data)
