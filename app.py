@@ -282,7 +282,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     수정된필드 = {}
 
     for keyword in sorted(field_map.keys(), key=lambda k: -len(k)):  # 긴 키워드 우선
-        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=$|\s{2,}|[,])"
+        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=\s+[가-힣]{2,10}(?:를|은|는|이|:|：))"
+
 
         matches = re.finditer(pattern, data)
 
