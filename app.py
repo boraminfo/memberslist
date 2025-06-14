@@ -389,55 +389,30 @@ def update_member():
 
 
 
+# 예시 시트 함수 (실제 구현에 맞게 교체)
+def get_member_sheet():
+    from some_module import connect_sheet
+    return connect_sheet()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ✅ 자연어 회원 등록 구문 파싱(신규회원등록)
-def parse_registration(text):
-    match = re.match(r"(.+?)\s*회원번호\s*(\d+)\s*등록", text)
-    if not match:
-        match = re.match(r"(.+?)\s+(\d+)\s*등록", text)
-    if match:
-        return match.group(1).strip(), match.group(2).strip()
-    return None, None
-
-# ✅ 자연어 회원 등록 처리 API
 @app.route("/register", methods=["POST"])
 def register_member():
     data = request.json
     text = data.get("text", "").strip()
 
-    # 패턴: 이름 + 회원번호
-    match_full = re.match(r"(.+?)\s*회원번호\s*(\d+)\s*등록", text)
-    match_alt = re.match(r"(.+?)\s+(\d{5,})\s*등록", text)
-    match_name_only = re.match(r"([가-힣]{2,4})\s*등록", text)
-    match_name_only = re.search(
-        r"([가-힣]{2,4})(?:님|을|를|이라는|이란|이라는\s+사람)?\s*(회원)?\s*(으로)?\s*등록", text)
+    # 회원명 + 회원번호 + 등록
+    match_full = re.match(r"([가-힣]{2,4})\s*(회원번호)?\s*(\d{5,})\s*등록", text)
+    # 회원명 + 등록
+    match_simple = re.match(r"([가-힣]{2,4})\s*등록", text)
 
     if match_full:
-        name, number = match_full.group(1).strip(), match_full.group(2).strip()
-    elif match_alt:
-        name, number = match_alt.group(1).strip(), match_alt.group(2).strip()
-    elif match_name_only:
-        name, number = match_name_only.group(1).strip(), ""
+        name = match_full.group(1).strip()
+        number = match_full.group(3).strip()
+    elif match_simple:
+        name = match_simple.group(1).strip()
+        number = ""
     else:
         return jsonify({
-            "error": "등록 형식을 인식할 수 없습니다. 예) '홍길동 등록' 또는 '홍길동 회원번호 12345678 등록'"
+            "error": "등록 형식을 인식할 수 없습니다. 예: '홍길동 등록' 또는 '홍길동 회원번호 12345 등록'"
         }), 400
 
     # 시트 연결
@@ -460,6 +435,26 @@ def register_member():
     if number:
         message += f" (회원번호 {number})"
     return jsonify({"message": message}), 200
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
