@@ -399,19 +399,23 @@ def parse_registration(text):
     import re
     text = text.strip()
 
+    # 형식 1: "홍길동 회원번호 12345678 등록"
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
     if match:
         return match.group(1).strip(), match.group(2).strip()
 
+    # 형식 2: "홍길동 12345678 등록"
     match = re.search(r"(.+?)\s+(\d{6,})", text)
     if match and "등록" in text:
         return match.group(1).strip(), match.group(2).strip()
 
-    match = re.search(r"(.+?)\s*등록", text)
+    # 형식 3: "홍길동 등록" 또는 "박 철수 등록"
+    match = re.search(r"^([가-힣\s]+)\s*등록$", text)
     if match:
         return match.group(1).strip(), None
 
     return None, None
+
 
 
 
