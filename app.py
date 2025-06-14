@@ -521,14 +521,35 @@ def save_member():
 
 
 
-# ✅ 회원 삭제 API
+
+# ✅ 회원 삭제 API (안전 확인 포함)
 @app.route('/delete_member', methods=['POST'])
 def delete_member():
     try:
-        name = request.get_json().get("회원명")
+        data = request.get_json()
+        요청문 = data.get("요청문", "").strip()
+        name = data.get("회원명", "").strip()
+        confirm = data.get("확인", "").strip().lower()  # "예", "아니오" 여부
+
+        # 삭제라는 말 없으면 거부
+        if "삭제" not in 요청문:
+            return jsonify({"message": "삭제 요청이 아닙니다. '삭제'라는 단어가 포함되어야 합니다."}), 400
+
         if not name:
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
+        # 삭제 확인이 아직 안된 경우 → 예/아니오 질문
+        if confirm not in ["예", "아니오"]:
+            return jsonify({
+                "message": f"'{name}' 회원을 정말 삭제하시겠습니까?",
+                "확인요청": "예 또는 아니오로 응답해 주세요."
+            }), 202
+
+        # "아니오"면 삭제 중단
+        if confirm == "아니오":
+            return jsonify({"message": "삭제 요청이 취소되었습니다."}), 200
+
+        # 예 → 삭제 진행
         sheet = get_member_sheet()
         data = sheet.get_all_records()
 
