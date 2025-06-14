@@ -529,34 +529,34 @@ def delete_member():
         data = request.get_json()
         요청문 = data.get("요청문", "").strip()
         name = data.get("회원명", "").strip()
-        confirm = data.get("확인", "").strip().lower()  # "예", "아니오" 여부
+        confirm = data.get("확인", "").strip().lower()
 
-        # 삭제라는 말 없으면 거부
+        # ✅ 요청문에 삭제라는 단어 포함 필수
         if "삭제" not in 요청문:
             return jsonify({"message": "삭제 요청이 아닙니다. '삭제'라는 단어가 포함되어야 합니다."}), 400
 
         if not name:
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
-        # 삭제 확인이 아직 안된 경우 → 예/아니오 질문
+        # ✅ 확인 여부가 아직 없는 경우
         if confirm not in ["예", "아니오"]:
             return jsonify({
                 "message": f"'{name}' 회원을 정말 삭제하시겠습니까?",
                 "확인요청": "예 또는 아니오로 응답해 주세요."
             }), 202
 
-        # "아니오"면 삭제 중단
+        # ✅ 아니오 응답 시
         if confirm == "아니오":
             return jsonify({"message": "삭제 요청이 취소되었습니다."}), 200
 
-        # 예 → 삭제 진행
+        # ✅ 예 응답 시 실제 삭제
         sheet = get_member_sheet()
-        data = sheet.get_all_records()
+        data_rows = sheet.get_all_records()
 
-        for i, row in enumerate(data):
+        for i, row in enumerate(data_rows):
             if row.get('회원명') == name:
-                sheet.delete_rows(i + 2)  # 헤더 포함으로 인덱스 +2
-                return jsonify({"message": f"'{name}' 회원 삭제 완료"}), 200
+                sheet.delete_rows(i + 2)
+                return jsonify({"message": f"✅ '{name}' 회원 삭제 완료"}), 200
 
         return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
 
@@ -564,6 +564,8 @@ def delete_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
 
 
 
