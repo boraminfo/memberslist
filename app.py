@@ -398,31 +398,32 @@ def get_member_sheet():
 def parse_registration(text):
     import re
     text = text.strip()
-    print(f"[디버그] 🔍 입력 텍스트: '{text}'")
+    print(f"[🔍DEBUG] 입력 text: '{text}'")
 
     # 형식 1
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
     if match:
         name, number = match.group(1).strip(), match.group(2).strip()
-        print(f"[디버그] ✅ 패턴1 매칭: name={name}, number={number}")
+        print(f"[✅DEBUG] 형식1 매칭 → name: '{name}', number: '{number}'")
         return name, number
 
     # 형식 2
     match = re.search(r"(.+?)\s+(\d{6,})", text)
     if match and "등록" in text:
         name, number = match.group(1).strip(), match.group(2).strip()
-        print(f"[디버그] ✅ 패턴2 매칭: name={name}, number={number}")
+        print(f"[✅DEBUG] 형식2 매칭 → name: '{name}', number: '{number}'")
         return name, number
 
-    # 형식 3
+    # 형식 3 (김철수 등록, 김 철수 등록)
     match = re.search(r"^([\w가-힣\s]+?)\s*등록$", text)
     if match:
         name = match.group(1).strip()
-        print(f"[디버그] ✅ 패턴3 매칭: name={name}, number=None")
+        print(f"[✅DEBUG] 형식3 매칭 → name: '{name}', number: None")
         return name, None
 
-    print("[디버그] ❌ 어떤 패턴과도 매칭되지 않음")
+    print("[❌DEBUG] 어떤 패턴에도 매칭되지 않음.")
     return None, None
+
 
 
 
@@ -493,6 +494,9 @@ def register_member():
     print(f"[6] ✅ 신규 회원 '{name}' 저장 완료")
     return jsonify({"message": f"{name} 회원 등록 완료"})
 
+    # 이름과 회원번호 파싱
+    name, number = parse_registration(text)
+    print(f"[📦DEBUG] 최종 파싱 결과 → name: '{name}', number: '{number}'")
 
 
 
