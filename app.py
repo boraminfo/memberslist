@@ -490,13 +490,16 @@ def register_member():
         except ValueError:
             print(f"[5] ⚠️ '{key}' 컬럼이 없음 → 무시됨")
 
+
+    print(f"[5] 💬 최종 new_row 값: {new_row}")
+    print(f"[4] 헤더 raw: {sheet.row_values(1)}")
+    print(f"[4] 헤더 strip 적용 후: {headers}")
+
     sheet.append_row(new_row)
     print(f"[6] ✅ 신규 회원 '{name}' 저장 완료")
     return jsonify({"message": f"{name} 회원 등록 완료"})
 
-    # 이름과 회원번호 파싱
-    name, number = parse_registration(text)
-    print(f"[📦DEBUG] 최종 파싱 결과 → name: '{name}', number: '{number}'")
+
 
 
 
@@ -1019,6 +1022,9 @@ def handle_order_save(data):
         raise Exception("제품주문 시트를 찾을 수 없습니다.")
 
     order_date = process_order_date(data.get("주문일자", ""))
+    # ✅ 회원명 정제
+    raw_name = data.get("회원명", "")
+    name = re.sub(r"\s*등록$", "", raw_name).strip()
     row = [
         order_date,
         data.get("회원명", ""),
@@ -1063,7 +1069,8 @@ def handle_order_save(data):
 def add_order():
     try:
         data = request.get_json()
-        member_name = data.get("회원명", "").strip()
+        member_name = re.sub(r"\s*등록$", "", data.get("회원명", "")).strip()
+      
         if not member_name:
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
