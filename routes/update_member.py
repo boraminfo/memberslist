@@ -39,6 +39,7 @@ async def update_member(request: Request):
     print(f"[회원명 목록] {name_column}")
 
     for i, cell_value in enumerate(name_column):
+        print(f"[회원명 비교] 시트값: '{cell_value.strip()}' vs 요청값: '{name}'")
         if cell_value.strip() == name:
             row_to_update = i + 2  # 실제 행 번호
             print(f"[수정 대상 행 번호] {row_to_update}")
