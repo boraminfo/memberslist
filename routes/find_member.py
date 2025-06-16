@@ -22,8 +22,7 @@ async def find_member(request: Request):
         row_name = str(row.get("회원명", "")).strip()
         row_number = str(row.get("회원번호", "")).strip()
 
-        # 디버깅용 로그 (원할 경우 주석 처리 가능)
-        print(f"확인 중: 회원명={row_name}, 회원번호={row_number}")
+ 
 
         if name and number:
             if row_name == name and row_number == number:
