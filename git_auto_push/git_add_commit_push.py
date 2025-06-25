@@ -80,14 +80,16 @@ def main():
     # ✅ Git 초기화 및 설정
     subprocess.run(["git", "init"], shell=True)
     subprocess.run(["git", "checkout", "-B", "main"], shell=True)  # ✅ main으로 생성 및 전환
-    subprocess.run(["git", "config", "user.name", user["name"]], shell=True)
-    subprocess.run(["git", "config", "user.email", user["email"]], shell=True)
+    subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
+    subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
+
 
     # ✅ 최소 한 번 커밋 (필수!)
     subprocess.run(["git", "add", "."], shell=True)
     subprocess.run(["git", "commit", "-m", "최초 커밋"], shell=True)
 
     # ✅ 원격 설정 및 푸시
+    subprocess.run(["git", "remote", "remove", "origin"], shell=True)
     subprocess.run(["git", "remote", "add", "origin", user["remote"]], shell=True)
     subprocess.run(["git", "push", "-u", "origin", "main"], shell=True)
 
