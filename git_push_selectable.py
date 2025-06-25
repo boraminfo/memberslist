@@ -43,7 +43,7 @@ print(f"[1] {env_vars.get('USER1_NAME')}")
 print(f"[2] {env_vars.get('USER2_NAME')}")
 print(f"[3] {env_vars.get('USER3_NAME')}")
 print("===============================")
-choice = input("번호를 입력하세요 (1~3): ").strip()
+choice = input("번호를 입력하세요 (1~3): ").strip()q
 
 if choice not in {"1", "2", "3"}:
     print("❌ 잘못된 선택입니다.")
