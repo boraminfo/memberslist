@@ -78,10 +78,18 @@ def main():
 
     # ✅ Git 초기화 및 설정
     subprocess.run(["git", "init"], shell=True)
-    subprocess.run(["git", "branch", "-M", "main"], shell=True)  # <- 이 줄 추가
+    subprocess.run(["git", "checkout", "-B", "main"], shell=True)  # ✅ main으로 생성 및 전환
     subprocess.run(["git", "config", "user.name", user["name"]], shell=True)
     subprocess.run(["git", "config", "user.email", user["email"]], shell=True)
+
+    # ✅ 최소 한 번 커밋 (필수!)
+    subprocess.run(["git", "add", "."], shell=True)
+    subprocess.run(["git", "commit", "-m", "최초 커밋"], shell=True)
+
+    # ✅ 원격 설정 및 푸시
     subprocess.run(["git", "remote", "add", "origin", user["remote"]], shell=True)
+    subprocess.run(["git", "push", "-u", "origin", "main"], shell=True)
+
 
     # ✅ 원격 브랜치 pull
     print("\n📥 git pull 실행 중...")
@@ -90,7 +98,9 @@ def main():
         shell=True,
         env=env
     )
-
+    if pull_result.returncode != 0:
+        print("⚠️ git pull 중 충돌이 발생했을 수 있습니다.")
+        print("🛠 충돌 파일을 수동으로 병합한 후, add + commit 해주세요.")
 
     # ✅ 커밋 메시지 입력
     commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
