@@ -69,12 +69,13 @@ def main():
     env["GIT_SSH_COMMAND"] = f'ssh -i "{user["ssh"]}"'
 
     # ✅ 기존 .git 폴더 삭제
-    git_dir = ".git"
-    if os.path.exists(git_dir):
-        print("🧹 기존 Git 설정 초기화")
-        safe_rmtree(git_dir)
-    else:
-        print("✅ .git 폴더가 존재하지 않습니다. 초기화 생략.")
+    subprocess.run(["git", "init"], shell=True)
+    subprocess.run(["git", "checkout", "-B", "main"], shell=True)
+
+    # ✅ 사용자별 Git 설정 (로컬로)
+    subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
+    subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
+
 
     # ✅ Git 초기화 및 설정
     subprocess.run(["git", "init"], shell=True)
