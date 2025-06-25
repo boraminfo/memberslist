@@ -98,6 +98,13 @@ def main():
     subprocess.run(["git", "commit", "-m", commit_msg], shell=True)
 
     print("✅ Git 초기화 및 커밋 완료! (Push는 제외됨)")
+    # ✅ 사용자 SSH 키로 push 실행
+    print("📤 push 실행 중...")
+    push_env = os.environ.copy()
+    push_env["GIT_SSH_COMMAND"] = f'ssh -i "{user["ssh"]}"'
+    subprocess.run(["git", "push", "-u", "origin", "main", "--force"], shell=True, env=push_env)
+
+    print("✅ Git push 완료!")
 
 if __name__ == "__main__":
     main()
