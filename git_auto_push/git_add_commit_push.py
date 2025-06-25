@@ -93,7 +93,7 @@ def main():
 
     # ✅ 원격 브랜치 pull
     print("\n📥 git pull 실행 중...")
-    subprocess.run(
+    pull_result = subprocess.run(
         ["git", "pull", "origin", "main", "--allow-unrelated-histories"],
         shell=True,
         env=env
@@ -101,6 +101,7 @@ def main():
     if pull_result.returncode != 0:
         print("⚠️ git pull 중 충돌이 발생했을 수 있습니다.")
         print("🛠 충돌 파일을 수동으로 병합한 후, add + commit 해주세요.")
+
 
     # ✅ 커밋 메시지 입력
     commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
