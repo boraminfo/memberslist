@@ -1,4 +1,5 @@
 import os
+import sys
 import subprocess
 import shutil
 from pathlib import Path
@@ -52,7 +53,12 @@ def select_user(env_vars):
     }
 
 def main():
-    env_file = select_pc_env()
+    if len(sys.argv) > 1:
+        env_file = sys.argv[1]
+    else:
+        env_file = select_pc_env()  # fallback
+
+
     env_vars = load_env(env_file)
     user = select_user(env_vars)
 
