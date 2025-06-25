@@ -53,13 +53,15 @@ def select_user(env_vars):
     }
 
 def main():
-    if len(sys.argv) > 1:
-        env_file = sys.argv[1]
-    else:
-        env_file = select_pc_env()  # fallback
+    base_dir = Path(__file__).parent  # git_auto_push 폴더 기준
+    env_file_name = select_pc_env()
+    env_file_path = base_dir / env_file_name
 
+    if not env_file_path.exists():
+        print(f"❌ .env 파일이 존재하지 않습니다: {env_file_path}")
+        return
 
-    env_vars = load_env(env_file)
+    env_vars = load_env(env_file_path)
     user = select_user(env_vars)
 
     # ✅ GIT_SSH_COMMAND 환경변수 설정
