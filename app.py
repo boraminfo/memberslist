@@ -1320,20 +1320,6 @@ def delete_order_confirm():
 
 
 
-# 테스트용 주석입니다.
-
-# ✅ 정말 새로운 주석입니다.
-print("테스트 실행 중입니다.")
-
-# ✅ 강제로 커밋할 내용입니다
-# ✅ 강제로 변경을 만들어 커밋을 유도
-with open("temp_git_test.txt", "a", encoding="utf-8") as f:
-    f.write("🔁 자동 테스트용 변경\n")
-
-# 테스트용 해볼게
-
-# 진자 테스트
-
 
 # 서버 실행
 if __name__ == "__main__":
