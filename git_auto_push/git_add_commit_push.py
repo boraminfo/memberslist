@@ -4,6 +4,9 @@ import subprocess
 import shutil
 from pathlib import Path
 
+
+
+
 # ✅ .git 디렉토리 강제 삭제 함수
 def safe_rmtree(path):
     try:
@@ -64,46 +67,43 @@ def main():
     env_vars = load_env(env_file_path)
     user = select_user(env_vars)
 
+  
     # ✅ GIT_SSH_COMMAND 환경변수 설정
-    env = os.environ.copy()
-    env["GIT_SSH_COMMAND"] = f'ssh -i "{user["ssh"]}"'
+    git_env = os.environ.copy()
+    git_env["GIT_SSH_COMMAND"] = f'ssh -i "{user["ssh"]}"'
 
     # ✅ 기존 .git 폴더 삭제
     subprocess.run(["git", "init"], shell=True)
     subprocess.run(["git", "checkout", "-B", "main"], shell=True)
 
     # ✅ 사용자별 Git 설정 (로컬로)
-    subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
-    subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
-
-
-    # ✅ Git 초기화 및 설정
     subprocess.run(["git", "init"], shell=True)
-    subprocess.run(["git", "checkout", "-B", "main"], shell=True)  # ✅ main으로 생성 및 전환
+    subprocess.run(["git", "checkout", "-B", "main"], shell=True)
     subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
     subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
-
 
     # ✅ 최소 한 번 커밋 (필수!)
     subprocess.run(["git", "add", "."], shell=True)
     subprocess.run(["git", "commit", "-m", "최초 커밋"], shell=True)
 
-    # ✅ 원격 설정 및 푸시
+    # ✅ 리모트 재설정
     subprocess.run(["git", "remote", "remove", "origin"], shell=True)
     subprocess.run(["git", "remote", "add", "origin", user["remote"]], shell=True)
-    subprocess.run(["git", "push", "-u", "origin", "main"], shell=True)
 
+    # ✅ 강제 Push
+    print("📤 push 실행 중...")
+    subprocess.run(["git", "push", "-u", "origin", "main", "--force"], shell=True, env=git_env)
 
-    # ✅ 원격 브랜치 pull
-    print("\n📥 git pull 실행 중...")
+    # ✅ Pull 시도 (병합 허용)
+    print("📥 git pull 실행 중...")
     pull_result = subprocess.run(
         ["git", "pull", "origin", "main", "--allow-unrelated-histories"],
         shell=True,
-        env=env
+        env=git_env
     )
     if pull_result.returncode != 0:
         print("⚠️ git pull 중 충돌이 발생했을 수 있습니다.")
-        print("🛠 충돌 파일을 수동으로 병합한 후, add + commit 해주세요.")
+        print("🛠 수동 병합 후 add + commit을 수행하세요.")
 
 
     # ✅ 커밋 메시지 입력
@@ -116,20 +116,18 @@ def main():
     subprocess.run(["git", "add", "."], shell=True)
 
     # 변경된 파일이 있을 경우만 커밋
-    commit_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
-    if commit_result.returncode != 0:
+    diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
+    if diff_result.returncode != 0:
         subprocess.run(["git", "commit", "-m", commit_msg], shell=True)
         print("✅ 변경 사항이 커밋되었습니다.")
     else:
         print("ℹ️ 커밋할 변경 사항이 없습니다.")
 
-    print("✅ Git 초기화 및 커밋 완료! (Push는 제외됨)")
+    print("✅ Git 초기화 및 커밋 완료!)")
     
-    # ✅ 사용자 SSH 키로 push 실행
-    print("📤 push 실행 중...")
-    push_env = os.environ.copy()
-    push_env["GIT_SSH_COMMAND"] = f'ssh -i "{user["ssh"]}"'
-    subprocess.run(["git", "push", "-u", "origin", "main", "--force"], shell=True, env=push_env)
+    # git push 명령어 실행
+    print("📤 최종 Push 중...")
+    subprocess.run(["git", "push", "-u", "origin", "main"], shell=True, env=git_env)
 
     print("✅ Git push 완료!")
 
