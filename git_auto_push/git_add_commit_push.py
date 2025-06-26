@@ -113,7 +113,7 @@ def main():
 
     # ✅ Git add, commit
     print("🚀 Git 커밋 작업 시작...")
-    subprocess.run(["git", "add", "."], shell=True)
+    subprocess.run(["git", "add", "-A"], shell=True)  # 수정: -A 플래그로 전체 스테이징
 
     # 변경된 파일이 있을 경우만 커밋
     diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
