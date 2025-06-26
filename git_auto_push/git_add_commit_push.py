@@ -112,16 +112,20 @@ def main():
         commit_msg = "자동 커밋"
 
     # ✅ Git add, commit
-    print("🚀 Git 커밋 작업 시작...")
-    subprocess.run(["git", "add", "-A"], shell=True)  # 수정: -A 플래그로 전체 스테이징
+    subprocess.run(["git", "add", "."], shell=True)
 
-    # 변경된 파일이 있을 경우만 커밋
+    # 커밋 전 변경 사항 확인
     diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
+
     if diff_result.returncode != 0:
+        print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
+        print("🚀 Git 커밋 작업 시작...")
         subprocess.run(["git", "commit", "-m", commit_msg], shell=True)
         print("✅ 변경 사항이 커밋되었습니다.")
     else:
         print("ℹ️ 커밋할 변경 사항이 없습니다.")
+
+
 
     print("✅ Git 초기화 및 커밋 완료!)")
     
