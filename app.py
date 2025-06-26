@@ -16,8 +16,6 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 
 
-
-
 # ✅ 환경 변수 로드
 
 
