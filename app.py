@@ -1332,7 +1332,7 @@ with open("temp_git_test.txt", "a", encoding="utf-8") as f:
 
 # 테스트용 해볼게
 
-
+# 진자 테스트
 
 
 # 서버 실행
