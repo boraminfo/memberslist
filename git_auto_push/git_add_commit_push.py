@@ -101,9 +101,11 @@ def main():
 
 
 
+    # ✅ add 먼저!
+    subprocess.run(["git", "add", "."], check=True)
 
-    # ✅ git add 전에 diff 확인
-    diff_result = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True)
+    # ✅ 커밋 대상 변경 사항 확인
+    diff_result = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
     changed_files = diff_result.stdout.strip()
 
     if not changed_files:
@@ -113,16 +115,14 @@ def main():
 
         changed_files_display = changed_files.replace("\n", ", ")
 
-        # 💬 커밋 메시지 입력
         commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
         if not commit_msg:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             commit_msg = f"자동 커밋: {now} | 수정 파일: {changed_files_display}"
 
-        # ✅ add & commit
-        subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
         print("✅ Git 커밋 완료!")
+
 
 
 
