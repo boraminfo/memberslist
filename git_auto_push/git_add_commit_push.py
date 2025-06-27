@@ -102,9 +102,19 @@ def main():
 
     # ✅ 커밋 메시지 입력
     commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
+
+    # 변경된 파일명 추출
+    diff_result = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True)
+    changed_files = diff_result.stdout.strip().replace("\n", ", ")
+
+    # 메시지 자동 완성
     if not commit_msg:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        commit_msg = f"자동 커밋: {now}"
+        if changed_files:
+            commit_msg = f"자동 커밋: {now} | 수정 파일: {changed_files}"
+        else:
+            commit_msg = f"자동 커밋: {now}"
+
 
     # ✅ Git 명령어 실행 변경 사항 확인 후 커밋
     status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
