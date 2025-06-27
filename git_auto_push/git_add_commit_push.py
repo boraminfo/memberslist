@@ -102,16 +102,16 @@ def main():
 
 
 
-    # ✅ 2. git reset 먼저 수행
-    subprocess.run(["git", "reset"], check=True)
+    # ✅ 스테이징된 변경사항 있는지 확인
+    subprocess.run(["git", "add", "."], shell=True)
 
-    # ✅ 3. HEAD 기준 변경 사항 확인 (작업 디렉토리 → HEAD 기준)
-    diff_head = subprocess.run(["git", "diff", "HEAD", "--name-only"], capture_output=True, text=True)
+    # ✅ 스테이징된 변경 파일 확인
+    diff_head = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
     head_changes = diff_head.stdout.strip()
 
     if not head_changes:
-        print("ℹ️ 변경 사항 없어 스크립트를 종료합니다.")
-        exit(0)
+        print("ℹ️ 변경 사항이 없어 커밋을 생략합니다.")
+        return False
 
     # ✅ 4. 변경 있음 → add . 후 확인
     subprocess.run(["git", "add", "."], check=True)
