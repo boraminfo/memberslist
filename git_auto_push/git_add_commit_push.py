@@ -131,9 +131,9 @@ def main():
 
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
-        print("✅ 변경 사항이 커밋되었습니다.")
+        print("✅ Git 초기화 및 커밋 완료!)")
 
-    print("✅ Git 초기화 및 커밋 완료!)")
+    
     
 
 
