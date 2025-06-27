@@ -100,9 +100,21 @@ def main():
         print("🛠 수동 병합 후 add + commit을 수행하세요.")
 
 
-    # 💡 모든 staging area 초기화 (HEAD 기준으로)
+
+
+
+
+    # 강제 reset
     subprocess.run(["git", "reset"], check=True)
-    
+
+    # 변경사항 존재하는지 직접 검사
+    diff_check = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True)
+    diff_files = diff_check.stdout.strip()
+
+    if not diff_files:
+        print("ℹ️ 변경 사항이 없어 스크립트를 종료합니다.")
+        exit(0)
+
     # ✅ 스테이징 먼저
     subprocess.run(["git", "add", "."], check=True)
 
