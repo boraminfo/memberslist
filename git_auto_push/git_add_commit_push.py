@@ -3,7 +3,7 @@ import sys
 import subprocess
 import shutil
 from pathlib import Path
-from datetime import datetime
+
 
 
 
@@ -77,12 +77,12 @@ def main():
     subprocess.run(["git", "checkout", "-B", "main"], shell=True)
 
     # ✅ 사용자별 Git 설정 (로컬로)
+    subprocess.run(["git", "init"], shell=True)
+    subprocess.run(["git", "checkout", "-B", "main"], shell=True)
     subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
     subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
 
-    # ✅ 최소 한 번 커밋 (필수!)
-    subprocess.run(["git", "add", "."], shell=True)
-    subprocess.run(["git", "commit", "-m", "최초 커밋"], shell=True)
+
 
     # ✅ 리모트 재설정
     subprocess.run(["git", "remote", "remove", "origin"], shell=True)
@@ -102,6 +102,8 @@ def main():
 
 
 
+    # ✅ 2. git reset 먼저 수행
+    subprocess.run(["git", "reset"], check=True)
 
     # ✅ 3. HEAD 기준 변경 사항 확인 (작업 디렉토리 → HEAD 기준)
     diff_head = subprocess.run(["git", "diff", "HEAD", "--name-only"], capture_output=True, text=True)
@@ -132,7 +134,12 @@ def main():
     print("✅ Git 커밋 완료!")
 
 
- 
+
+
+
+
+
+
 
     # git push 명령어 실행
     print("📤 최종 Push 중...")
@@ -142,5 +149,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
