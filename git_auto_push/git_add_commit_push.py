@@ -106,9 +106,15 @@ def main():
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         commit_msg = f"자동 커밋: {now}"
 
-    # ✅ Git 명령어 실행
-    subprocess.run(["git", "add", "."], check=True)
-    subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+    # ✅ Git 명령어 실행 변경 사항 확인 후 커밋
+    status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
+    if not status.stdout.strip():
+        print("ℹ️ 커밋할 변경 사항이 없습니다. 커밋을 생략합니다.")
+    else:
+        subprocess.run(["git", "add", "."], check=True)
+        subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+        print("✅ 변경 사항이 커밋되었습니다.")
+
 
     print("✅ 커밋 및 푸시 완료!")
 
