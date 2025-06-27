@@ -100,26 +100,25 @@ def main():
         print("🛠 수동 병합 후 add + commit을 수행하세요.")
 
 
-    # ✅ 커밋 메시지 입력
-    commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
+
 
     # 변경된 파일명 추출
     diff_result = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True)
     changed_files = diff_result.stdout.strip().replace("\n", ", ")
 
-    # 메시지 자동 완성
+
+    # ✅ 커밋 메시지 입력
+    commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
     if not commit_msg:
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        commit_msg = f"자동 커밋: {now}"
         if changed_files:
-            commit_msg = f"자동 커밋: {now} | 수정 파일: {changed_files}"
-        else:
-            commit_msg = f"자동 커밋: {now}"
+            commit_msg += f" | 수정 파일: {changed_files}"
 
-
-    # ✅ Git 명령어 실행 변경 사항 확인 후 커밋
+    # ✅ 커밋할 변경 사항 확인 및 처리
     status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
     if not status.stdout.strip():
-        print("ℹ️ 커밋할 변경 사항이 없습니다. 커밋을 생략합니다.")
+        print("ℹ️ 커밋할 변경 사항이 없습니다.")
     else:
         print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
         subprocess.run(["git", "add", "."], check=True)
