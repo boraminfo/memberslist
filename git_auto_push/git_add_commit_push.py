@@ -121,26 +121,10 @@ def main():
     if not status.stdout.strip():
         print("ℹ️ 커밋할 변경 사항이 없습니다. 커밋을 생략합니다.")
     else:
+        print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
         subprocess.run(["git", "add", "."], check=True)
         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
         print("✅ 변경 사항이 커밋되었습니다.")
-
-
-    print("✅ 커밋 및 푸시 완료!")
-
-
-    # 커밋 전 변경 사항 확인
-    diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
-
-    if diff_result.returncode != 0:
-        print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
-        print("🚀 Git 커밋 작업 시작...")
-        subprocess.run(["git", "commit", "-m", commit_msg], shell=True)
-        print("✅ 변경 사항이 커밋되었습니다.")
-    else:
-        print("ℹ️ 커밋할 변경 사항이 없습니다.")
-
-
 
 
     print("✅ Git 초기화 및 커밋 완료!)")
