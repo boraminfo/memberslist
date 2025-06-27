@@ -103,29 +103,27 @@ def main():
 
 
 
+    # ✅ 1. 먼저 reset으로 스테이징 초기화
+    subprocess.run(["git", "reset"], check=True)
 
-    # ✅ 변경 사항이 실제로 있는지 HEAD 기준 확인
+    # ✅ 2. HEAD 기준 변경사항 확인
     diff_head = subprocess.run(["git", "diff", "HEAD", "--name-only"], capture_output=True, text=True)
     if not diff_head.stdout.strip():
         print("ℹ️ 변경 사항 없어 스크립트를 종료합니다.")
         exit(0)
 
-    # ✅ staging 초기화 및 add
-    subprocess.run(["git", "reset"], check=True)
+    # ✅ 3. 변경 감지됨 → 스테이징
     subprocess.run(["git", "add", "."], check=True)
 
-    # ✅ 커밋할 변경 목록 확인
+    # ✅ 4. 스테이징된 파일 확인
     diff_cached = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
     changed_files = diff_cached.stdout.strip()
 
-    print("\n=== [DEBUG] Staged 변경 파일 목록 ===")
-    print(changed_files if changed_files else "(없음)")
-
+    # ✅ 5. 커밋 메시지
     if not changed_files:
-        print("ℹ️ 스테이징된 변경 파일이 없어 커밋을 생략합니다.")
-        exit(0)
+        print("⚠️ 예상치 못한 오류: 스테이징된 변경이 없습니다.")
+        exit(1)
 
-    # ✅ 커밋 메시지 입력
     print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
     commit_msg = input("💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
     if not commit_msg:
@@ -133,9 +131,9 @@ def main():
         changed_files_display = changed_files.replace('\n', ', ')
         commit_msg = f"자동 커밋: {now} | 수정 파일: {changed_files_display}"
 
-    # ✅ 커밋 실행
     subprocess.run(["git", "commit", "-m", commit_msg], check=True)
     print("✅ Git 커밋 완료!")
+
 
  
 
