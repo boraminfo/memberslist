@@ -101,10 +101,10 @@ def main():
 
 
 
-    # ✅ add 먼저!
+    # ✅ 스테이징 먼저
     subprocess.run(["git", "add", "."], check=True)
 
-    # ✅ 커밋 대상 변경 사항 확인
+    # ✅ 커밋 대상 확인 (HEAD vs staged)
     diff_result = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
     changed_files = diff_result.stdout.strip()
 
@@ -112,7 +112,6 @@ def main():
         print("ℹ️ 커밋할 변경 사항이 없습니다.")
     else:
         print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
-
         changed_files_display = changed_files.replace("\n", ", ")
 
         commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
