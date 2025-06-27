@@ -100,7 +100,9 @@ def main():
         print("🛠 수동 병합 후 add + commit을 수행하세요.")
 
 
-
+    # 💡 모든 staging area 초기화 (HEAD 기준으로)
+    subprocess.run(["git", "reset"], check=True)
+    
     # ✅ 스테이징 먼저
     subprocess.run(["git", "add", "."], check=True)
 
