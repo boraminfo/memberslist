@@ -3,7 +3,7 @@ import sys
 import subprocess
 import shutil
 from pathlib import Path
-
+from datetime import datetime
 
 
 
@@ -109,10 +109,15 @@ def main():
     # ✅ 커밋 메시지 입력
     commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
     if not commit_msg:
-        commit_msg = "자동 커밋"
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        commit_msg = f"자동 커밋: {now}"
 
-    # ✅ Git add, commit
-    subprocess.run(["git", "add", "."], shell=True)
+    # ✅ Git 명령어 실행
+    subprocess.run(["git", "add", "."], check=True)
+    subprocess.run(["git", "commit", "-m", commit_msg], check=True)
+
+    print("✅ 커밋 및 푸시 완료!")
+
 
     # 커밋 전 변경 사항 확인
     diff_result = subprocess.run(["git", "diff", "--cached", "--quiet"], shell=True)
@@ -138,3 +143,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
