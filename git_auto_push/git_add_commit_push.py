@@ -103,27 +103,24 @@ def main():
 
 
 
-    # ✅ 1. 먼저 reset으로 스테이징 초기화
-    subprocess.run(["git", "reset"], check=True)
-
-    # ✅ 2. HEAD 기준 변경사항 확인
+    # ✅ 3. HEAD 기준 변경 사항 확인 (작업 디렉토리 → HEAD 기준)
     diff_head = subprocess.run(["git", "diff", "HEAD", "--name-only"], capture_output=True, text=True)
-    if not diff_head.stdout.strip():
+    head_changes = diff_head.stdout.strip()
+
+    if not head_changes:
         print("ℹ️ 변경 사항 없어 스크립트를 종료합니다.")
         exit(0)
 
-    # ✅ 3. 변경 감지됨 → 스테이징
+    # ✅ 4. 변경 있음 → add . 후 확인
     subprocess.run(["git", "add", "."], check=True)
-
-    # ✅ 4. 스테이징된 파일 확인
     diff_cached = subprocess.run(["git", "diff", "--cached", "--name-only"], capture_output=True, text=True)
     changed_files = diff_cached.stdout.strip()
 
-    # ✅ 5. 커밋 메시지
     if not changed_files:
-        print("⚠️ 예상치 못한 오류: 스테이징된 변경이 없습니다.")
+        print("⚠️ 예상치 못한 오류: 스테이징된 변경 없음")
         exit(1)
 
+    # ✅ 5. 커밋 메시지 처리
     print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
     commit_msg = input("💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
     if not commit_msg:
