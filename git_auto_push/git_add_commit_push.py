@@ -77,8 +77,6 @@ def main():
     subprocess.run(["git", "checkout", "-B", "main"], shell=True)
 
     # ✅ 사용자별 Git 설정 (로컬로)
-    subprocess.run(["git", "init"], shell=True)
-    subprocess.run(["git", "checkout", "-B", "main"], shell=True)
     subprocess.run(["git", "config", "--local", "user.name", user["name"]], shell=True)
     subprocess.run(["git", "config", "--local", "user.email", user["email"]], shell=True)
 
@@ -89,10 +87,6 @@ def main():
     # ✅ 리모트 재설정
     subprocess.run(["git", "remote", "remove", "origin"], shell=True)
     subprocess.run(["git", "remote", "add", "origin", user["remote"]], shell=True)
-
-    # ✅ 강제 Push
-    print("📤 push 실행 중...")
-    subprocess.run(["git", "push", "-u", "origin", "main", "--force"], shell=True, env=git_env)
 
     # ✅ Pull 시도 (병합 허용)
     print("📥 git pull 실행 중...")
