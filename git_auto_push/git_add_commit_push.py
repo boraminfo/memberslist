@@ -107,27 +107,22 @@ def main():
     changed_files = diff_result.stdout.strip().replace("\n", ", ")
 
 
-    # ✅ 커밋 메시지 입력
-    commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
-    if not commit_msg:
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        commit_msg = f"자동 커밋: {now}"
-        if changed_files:
-            commit_msg += f" | 수정 파일: {changed_files}"
 
-    # ✅ 커밋할 변경 사항 확인 및 처리
+
+
+    # ✅ 변경사항 확인 및 메시지 출력 (커밋 전!)
     status = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
-
     if not status.stdout.strip():
         print("ℹ️ 커밋할 변경 사항이 없습니다.")
     else:
         print("📝 변경 사항이 감지되어 커밋을 수행합니다.")
-        
+
         # 변경된 파일명 추출
         diff_result = subprocess.run(["git", "diff", "--name-only"], capture_output=True, text=True)
         changed_files = diff_result.stdout.strip().replace("\n", ", ")
 
-        # 커밋 메시지 생성
+        # 커밋 메시지 입력
+        commit_msg = input("\n💬 커밋 메시지를 입력하세요 (기본값: 자동 커밋): ").strip()
         if not commit_msg:
             now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             commit_msg = f"자동 커밋: {now}"
@@ -138,9 +133,12 @@ def main():
         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
         print("✅ 변경 사항이 커밋되었습니다.")
 
-
     print("✅ Git 초기화 및 커밋 완료!)")
     
+
+
+
+
     # git push 명령어 실행
     print("📤 최종 Push 중...")
     subprocess.run(["git", "push", "-u", "origin", "main"], shell=True, env=git_env)
