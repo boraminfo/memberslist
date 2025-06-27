@@ -122,15 +122,10 @@ def main():
         subprocess.run(["git", "commit", "-m", commit_msg], check=True)
         print("✅ Git 커밋 완료!")
 
+    print("=== [DEBUG] Staged 변경 파일 목록 ===")
+    print(changed_files if changed_files else "(없음)")
 
-
-
-
-    
-    
-
-
-
+ 
 
     # git push 명령어 실행
     print("📤 최종 Push 중...")
