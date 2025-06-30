@@ -15,10 +15,6 @@ from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
 
-# 이제 되나?
-#  
-
-
 
 
 
@@ -987,27 +983,6 @@ def insert_order_row(sheet, order_data):
         order_data.get('수령확인', '')
     ]
     sheet.append_row(row)
-
-
-
-
-# ✅ 사용 예시
-data = {
-    '회원명': '이태수',
-    '제품명': '칫솔 1통',
-    '제품가격': 9600,
-    'PV': 4800,
-    '결재방법': '카드',
-    '주문자_고객명': '박태수'
-}
-
-if sheet:
-    insert_order_row(sheet, data)
-
-
-
-
-
 
 
 
