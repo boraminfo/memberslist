@@ -1097,8 +1097,6 @@ def add_order():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
     
 
 
@@ -1297,6 +1295,7 @@ def delete_order_confirm():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
