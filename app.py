@@ -14,6 +14,10 @@ from datetime import datetime
 from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
+from utils.sheets import get_order_sheet, get_member_info
+
+
+
 import requests
 
 
@@ -45,6 +49,7 @@ print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KE
 
 
 app = Flask(__name__)
+
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
 if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
@@ -1314,7 +1319,7 @@ def delete_order_confirm():
 
 
 
-
+# 주석
 
 
 
