@@ -1115,41 +1115,49 @@ def parse_and_save_order():
 
 # ✅ 주문 저장 API
 @app.route("/save_order", methods=["POST"])
-def save_order(
-    회원명, 제품명, 제품가격, PV,
-    주문자_고객명=None,
-    주문자_휴대폰번호=None,
-    주문일자=None,
-    결재방법="카드",
-    배송처=None,
-    수령확인="0",
-    ORDER_API_ENDPOINT = os.getenv("ORDER_API_ENDPOINT")
+def save_order():
+    try:
+        data = request.get_json()
 
-):
+        회원명 = data.get("회원명")
+        주문일자 = process_order_date(data.get("주문일자"))
+        제품명 = data.get("제품명")
+        제품가격 = data.get("제품가격")
+        PV = data.get("PV")
+        결재방법 = data.get("결재방법", "카드")
+        주문자_고객명 = data.get("주문자_고객명")
+        주문자_휴대폰번호 = data.get("주문자_휴대폰번호")
+        배송처 = data.get("배송처")
+        수령확인 = data.get("수령확인", "0")
 
+        ORDER_API_ENDPOINT = os.getenv("ORDER_API_ENDPOINT")
 
-    data = {
-        "회원명": 회원명,
-        "주문일자": process_order_date(주문일자),  # ✅ 여기서 날짜 처리 통일
-        "제품명": 제품명,
-        "제품가격": 제품가격,
-        "PV": PV,
-        "결재방법": 결재방법,
-        "주문자_고객명": 주문자_고객명,
-        "주문자_휴대폰번호": 주문자_휴대폰번호,
-        "배송처": 배송처,
-        "수령확인": 수령확인
-    }
+        payload = {
+            "회원명": 회원명,
+            "주문일자": 주문일자,
+            "제품명": 제품명,
+            "제품가격": 제품가격,
+            "PV": PV,
+            "결재방법": 결재방법,
+            "주문자_고객명": 주문자_고객명,
+            "주문자_휴대폰번호": 주문자_휴대폰번호,
+            "배송처": 배송처,
+            "수령확인": 수령확인
+        }
 
-    response = requests.post(endpoint, json=data)
+        response = requests.post(ORDER_API_ENDPOINT, json=payload)
 
-    if response.status_code == 200:
-        print("✅ 주문 저장 성공:", response.json())
-        return response.json()
-    else:
-        print("❌ 주문 저장 실패:", response.status_code, response.text)
-        return None
+        if response.status_code == 200:
+            print("✅ 주문 저장 성공:", response.json())
+            return jsonify(response.json()), 200
+        else:
+            print("❌ 주문 저장 실패:", response.status_code, response.text)
+            return jsonify({"status": "error", "message": response.text}), 500
 
+    except Exception as e:
+        print("❌ 예외 발생:", str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
+        
     
 
 
