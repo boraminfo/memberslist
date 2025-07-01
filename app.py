@@ -1319,7 +1319,42 @@ def delete_order_confirm():
 
 
 
-# 주석
+
+
+
+
+@app.route("/save_order_batch", methods=["POST"])
+def save_order_batch():
+    try:
+        orders = request.get_json()
+        sheet = get_order_sheet()
+        rows_to_append = []
+
+        for order in orders:
+            회원명 = order.get("회원명")
+            회원번호, 회원_휴대폰 = get_member_info(회원명)
+
+            row = [
+                order.get("주문일자", ""),
+                회원명,
+                회원번호,
+                회원_휴대폰,
+                order.get("제품명", ""),
+                order.get("제품가격", ""),
+                order.get("PV", ""),
+                order.get("결재방법", "카드"),
+                order.get("주문자_고객명", ""),
+                order.get("주문자_휴대폰번호", ""),
+                order.get("배송처", ""),
+                order.get("수령확인", "0")
+            ]
+            rows_to_append.append(row)
+
+        sheet.append_rows(rows_to_append, value_input_option="USER_ENTERED")
+        return jsonify({"message": f"{len(rows_to_append)}건 저장 완료"}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
