@@ -1042,57 +1042,66 @@ def handle_order_save(data):
 
 
 # ✅ 제품 주문 등록 API
-@app.route("/add_order_from_text", methods=["POST"])
-def add_order_from_text():
+@app.route("/parse_and_save_order", methods=["POST"])
+def parse_and_save_order():
     try:
         raw_text = request.get_json().get("text", "")
         member_name_match = re.search(r"회원명\s*(\S+)\s*제품주문 저장", raw_text)
         if not member_name_match:
             return jsonify({"error": "회원명을 찾을 수 없습니다."}), 400
+
         member_name = member_name_match.group(1)
+        raw_orders = raw_text.replace(f"회원명 {member_name} 제품주문 저장", "").strip()
+        order_lines = [line.strip() for line in raw_orders.split('\n') if line.strip()]
 
-        # 주문자 정보 파싱용 패턴
-        item_pattern = re.compile(
-            r"(애터미[^\d]+?)\s*(\d+)개\s*(\d+)원\s*(\d+)PV\s*([가-힣]+)\s*(01[016789]-?\d{3,4}-?\d{4})\s*(.+?)(?=애터미|$)"
-        )
-        matches = item_pattern.findall(raw_text)
+        # 🔍 회원 정보 가져오기
+        member_sheet = get_member_sheet()
+        members = member_sheet.get_all_records()
+        member_info = next((m for m in members if m.get("회원명") == member_name), None)
 
-        if not matches:
-            return jsonify({"error": "제품 정보를 찾을 수 없습니다."}), 400
+        if not member_info:
+            return jsonify({"error": f"{member_name} 회원을 찾을 수 없습니다."}), 404
 
-        # 회원 정보 확인
-        sheet = get_member_sheet()
-        member_data = next((r for r in sheet.get_all_records() if r["회원명"] == member_name), None)
-        if not member_data:
-            return jsonify({"error": f"'{member_name}' 회원을 찾을 수 없습니다."}), 404
+        phone = member_info.get("휴대폰번호", "")
+        member_no = member_info.get("회원번호", "")
 
+        # 🧾 주문 시트
         order_sheet = get_product_order_sheet()
-        today = datetime.now().strftime("%Y-%m-%d")
 
-        rows_to_append = []
-        for product_name, quantity, price, pv, customer_name, phone, address in matches:
-            rows_to_append.append([
-                today,
-                member_name,
-                member_data.get("회원번호", ""),
-                member_data.get("휴대폰번호", ""),
-                f"{product_name.strip()} {quantity}개",
-                int(price),
-                int(pv),
-                "",  # 결제방법 생략
-                customer_name.strip(),
-                phone.strip(),
-                address.strip()
-            ])
+        for line in order_lines:
+            product_match = re.search(r"(.+?)\s(\d+)개\s([\d,]+)원\s([\d,]+)PV\s+(\S+)\s+(\d{3}-\d{4}-\d{4})\s+(.+)", line)
+            if not product_match:
+                continue
 
-        # 시트에 추가
-        for row in rows_to_append:
-            order_sheet.append_row(row)
+            product_name = product_match.group(1).strip()
+            quantity = int(product_match.group(2))
+            price = product_match.group(3).replace(",", "")
+            pv = product_match.group(4).replace(",", "")
+            customer_name = product_match.group(5).strip()
+            customer_phone = product_match.group(6).strip()
+            address = product_match.group(7).strip()
 
-        return jsonify({"message": f"{len(rows_to_append)}건 주문이 등록되었습니다."})
+            for _ in range(quantity):
+                order_sheet.append_row([
+                    datetime.today().strftime("%Y-%m-%d"),  # 주문일자
+                    member_name,
+                    member_no,
+                    phone,
+                    product_name,
+                    price,
+                    pv,
+                    "",  # 결재방법 (선택사항)
+                    customer_name,
+                    customer_phone,
+                    address,
+                    ""  # 수령확인 (선택사항)
+                ])
+
+        return jsonify({"status": "✅ 주문이 저장되었습니다."})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
     
 
