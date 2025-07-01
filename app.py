@@ -14,6 +14,7 @@ from datetime import datetime
 from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
+import requests
 
 
 
@@ -1157,7 +1158,7 @@ def save_order():
     except Exception as e:
         print("❌ 예외 발생:", str(e))
         return jsonify({"status": "error", "message": str(e)}), 500
-        
+
     
 
 
