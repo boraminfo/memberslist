@@ -562,7 +562,7 @@ def save_member():
 
         # 3. Fallback 처리
         if not name:
-            name = re.sub(r"\s*\d{6,}\s*등록$|\s*등록$", "", 회원명_입력값).strip()
+            name = re.sub(r"\s*\d{6,}\s*(회원등록|신규회원 등록|회원 추가)$|\s*(회원등록|신규회원 등록|회원 추가)$", "", 회원명_입력값).strip()
         if not number:
             number = req_raw.get("회원번호", "").strip()
 
@@ -583,8 +583,9 @@ def save_member():
                     "회원정보": 요약
                 }), 200
 
-        # 6. 등록 명령인지 확인
-        등록요청여부 = "등록" in 요청문 or "등록" in 회원명_입력값
+        # 6. '등록' 문구 포함 여부 확인
+        등록문구 = ["회원등록", "신규회원 등록", "회원 추가"]
+        등록요청여부 = any(문구 in 요청문 or 문구 in 회원명_입력값 for 문구 in 등록문구)
 
         if 등록요청여부:
             new_row = [''] * len(headers)
@@ -602,13 +603,14 @@ def save_member():
             }), 200
         else:
             return jsonify({
-                "message": f"'{name}' 회원은 등록되지 않았습니다. '등록' 문구가 포함되어야 합니다."
+                "message": f"'{name}' 회원은 등록되지 않았습니다. '회원등록', '신규회원 등록', '회원 추가' 문구가 포함되어야 합니다."
             }), 400
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
