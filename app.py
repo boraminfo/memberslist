@@ -1288,13 +1288,9 @@ def delete_order_confirm():
 
 
 
-
-
-
-
-
 # 주문 저장 엔드포인트
-def add_orders():
+@app.route("/add_orders", methods=["POST"])
+def add_orders():  # ← 누락된 함수 선언 추가
     data = request.json
     회원명 = data.get("회원명")
     orders = data.get("orders", [])
