@@ -1237,7 +1237,7 @@ def add_orders():  # ← 누락된 함수 선언 추가
             row_index = 2  # 항상 2행부터 위로 삽입
             for order in orders:
                 row = [
-                    datetime.now().strftime("%Y-%m-%d"),  # 주문일자
+                    order.get("주문일자", datetime.now().strftime("%Y-%m-%d")),  # ✅ 주문일자 우선, 없으면 오늘
                     회원명,
                     회원번호,
                     회원_휴대폰번호,
