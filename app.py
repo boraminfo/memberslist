@@ -159,8 +159,6 @@ client = gspread.authorize(creds)
 
 
 
-
-
 # ✅ Google Sheets 연동 함수
 def get_worksheet(sheet_name):
     try:
@@ -1040,14 +1038,14 @@ def handle_order_save(data):
         sheet.append_row(headers)
 
     # 중복 방지 로직
-    for existing in values[1:]:
-        if (existing[0] == order_date and
-            existing[1] == data.get("회원명") and
-            existing[4] == data.get("제품명")):
-            print("⚠️ 이미 동일한 주문이 존재하여 저장하지 않음")
-            return
+    #for existing in values[1:]:
+    #    if (existing[0] == order_date and
+    #        existing[1] == data.get("회원명") and
+    #        existing[4] == data.get("제품명")):
+    #        print("⚠️ 이미 동일한 주문이 존재하여 저장하지 않음")
+    #        return
 
-    sheet.insert_row(row, index=2)
+    #sheet.insert_row(row, index=2)
 
 
 
@@ -1343,6 +1341,58 @@ def add_orders():  # ← 누락된 함수 선언 추가
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_worksheet(sheet_name):
+    spreadsheet = client.open("members_list_main")
+    worksheet = spreadsheet.worksheet(sheet_name)
+    return worksheet
+
+def append_row_to_sheet(sheet, row):
+    sheet.append_row(row, value_input_option="USER_ENTERED")
+
+@app.route('/save_order_from_json', methods=['POST'])
+def save_order_from_json():
+    try:
+        data = request.get_json()
+        sheet = get_worksheet("제품주문")
+
+        if not isinstance(data, list):
+            return jsonify({"error": "JSON은 리스트 형식이어야 합니다."}), 400
+
+        for item in data:
+            row = [
+                "",  # 주문일자 무시
+                "",  # 회원명 무시
+                "",  # 회원번호 무시
+                "",  # 휴대폰번호 무시
+                item.get("제품명", ""),
+                item.get("제품가격", ""),
+                item.get("PV", ""),
+                "",  # 결재방법 무시
+                item.get("주문자_고객명", ""),
+                item.get("주문자_휴대폰번호", ""),
+                item.get("배송처", ""),
+                "",  # 수령확인 무시
+            ]
+            append_row_to_sheet(sheet, row)
+
+        return jsonify({"status": "success", "count": len(data)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
