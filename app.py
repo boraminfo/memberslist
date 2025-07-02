@@ -552,42 +552,48 @@ def register_member():
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
-        # 1. 요청값 정리
+        # 1. 요청값 수신 및 정리
         req_raw = request.get_json()
+        요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
+        회원명_입력값 = req_raw.get("회원명", "")
 
-        req = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in req_raw.items()}
-        name = re.sub(r"\s*등록$", "", req.get("회원명", "")).strip()
-    
-        number = req.get("회원번호", "").strip().lower()
-        요청문_raw = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
+        # 2. 자연어 등록 명령 파싱
+        from your_module import parse_registration  # ← 경로에 맞게 import 필요
+        name, number = parse_registration(요청문 or 회원명_입력값)
+
+        # 3. Fallback 처리
+        if not name:
+            name = re.sub(r"\s*\d{6,}\s*등록$|\s*등록$", "", 회원명_입력값).strip()
+        if not number:
+            number = req_raw.get("회원번호", "").strip()
 
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
-        # 2. 시트 데이터 준비
+        # 4. 시트 접근
         sheet = get_member_sheet()
         data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
 
-        # 3. 기존 회원 여부 확인
-        for i, row in enumerate(data):
+        # 5. 중복 확인
+        for row in data:
             if str(row.get("회원명", "")).strip() == name:
-                요약정보 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
+                요약 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
                 return jsonify({
                     "message": f"이미 등록된 회원 '{name}'입니다.",
-                    "회원정보": 요약정보
+                    "회원정보": 요약
                 }), 200
 
-        # 4. 등록 문구 포함 여부 확인
-        등록요청여부 = "등록" in 요청문_raw or "등록" in name
+        # 6. 등록 명령인지 확인
+        등록요청여부 = "등록" in 요청문 or "등록" in 회원명_입력값
 
         if 등록요청여부:
             new_row = [''] * len(headers)
             if "회원명" in headers:
                 new_row[headers.index("회원명")] = name
-            if "회원번호" in headers and number:
+            if "회원번호" in headers:
                 new_row[headers.index("회원번호")] = number
-            for key, value in req.items():
+            for key, value in req_raw.items():
                 if key in headers and key not in ["회원명", "회원번호"]:
                     new_row[headers.index(key)] = value
 
@@ -604,6 +610,7 @@ def save_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
