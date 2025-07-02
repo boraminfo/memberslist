@@ -35,7 +35,6 @@ def get_member_info(member_name):
     return "", ""
 
 
-
 # ✅ 제품주문 시트 가져오기
 def get_order_sheet():
     client = get_gspread_client()

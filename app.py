@@ -14,6 +14,11 @@ from datetime import datetime
 from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
+from utils.sheets import get_order_sheet, get_member_info
+
+
+
+import requests
 
 
 from utils.sheets import get_order_sheet, get_member_info
@@ -46,6 +51,7 @@ print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KE
 
 
 app = Flask(__name__)
+
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
 if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
@@ -1044,61 +1050,67 @@ def handle_order_save(data):
 
 
 # ✅ 제품 주문 등록 API
-@app.route("/add_order", methods=["POST"])
-def add_order():
+@app.route("/parse_and_save_order", methods=["POST"])
+def parse_and_save_order():
     try:
-        data = request.get_json()
-        member_name = re.sub(r"\s*등록$", "", data.get("회원명", "")).strip()
-      
-        if not member_name:
-            return jsonify({"error": "회원명을 입력해야 합니다."}), 400
+        raw_text = request.get_json().get("text", "")
+        member_name_match = re.search(r"회원명\s*(\S+)\s*제품주문 저장", raw_text)
+        if not member_name_match:
+            return jsonify({"error": "회원명을 찾을 수 없습니다."}), 400
 
-        # ✅ 회원 정보 확인
-        sheet = get_member_sheet()
+        member_name = member_name_match.group(1)
+        raw_orders = raw_text.replace(f"회원명 {member_name} 제품주문 저장", "").strip()
+        order_lines = [line.strip() for line in raw_orders.split('\n') if line.strip()]
 
-        records = sheet.get_all_records()
-        member_info = next((r for r in records if r.get("회원명") == member_name), None)
+        # 🔍 회원 정보 가져오기
+        member_sheet = get_member_sheet()
+        members = member_sheet.get_all_records()
+        member_info = next((m for m in members if m.get("회원명") == member_name), None)
+
         if not member_info:
-            return jsonify({"error": f"'{member_name}' 회원을 DB에서 찾을 수 없습니다."}), 404
+            return jsonify({"error": f"{member_name} 회원을 찾을 수 없습니다."}), 404
 
-        # ✅ 주문 시트 준비
+        phone = member_info.get("휴대폰번호", "")
+        member_no = member_info.get("회원번호", "")
+
+        # 🧾 주문 시트
         order_sheet = get_product_order_sheet()
 
-        if not order_sheet.get_all_values():
-            ORDER_HEADERS = [
-                "주문일자", "회원명", "회원번호", "휴대폰번호",
-                "제품명", "제품가격", "PV", "결재방법",
-                "주문자_고객명", "주문자_휴대폰번호", "배송처", "수령확인"
-            ]
-            order_sheet.append_row(ORDER_HEADERS)
+        for line in order_lines:
+            product_match = re.search(r"(.+?)\s(\d+)개\s([\d,]+)원\s([\d,]+)PV\s+(\S+)\s+(\d{3}-\d{4}-\d{4})\s+(.+)", line)
+            if not product_match:
+                continue
 
-        # ✅ 주문 행 구성
-        order_date = process_order_date(data.get("주문일자", ""))
-        row = [
-            order_date,
-            member_name,
-            member_info.get("회원번호", ""),
-            member_info.get("휴대폰번호", ""),
-            data.get("제품명", ""),
-            float(data.get("제품가격", 0)),
-            float(data.get("PV", 0)),
-            data.get("결재방법", ""),
-            data.get("주문자_고객명", ""),
-            data.get("주문자_휴대폰번호", ""),
-            data.get("배송처", ""),
-            data.get("수령확인", "")
-        ]
+            product_name = product_match.group(1).strip()
+            quantity = int(product_match.group(2))
+            price = product_match.group(3).replace(",", "")
+            pv = product_match.group(4).replace(",", "")
+            customer_name = product_match.group(5).strip()
+            customer_phone = product_match.group(6).strip()
+            address = product_match.group(7).strip()
 
-        # ✅ 2행(최신)으로 삽입
-        order_sheet.insert_row(row, index=2)
-        
-       
-        return jsonify({"message": "제품주문이 저장되었습니다."}), 200
+            for _ in range(quantity):
+                order_sheet.append_row([
+                    datetime.today().strftime("%Y-%m-%d"),  # 주문일자
+                    member_name,
+                    member_no,
+                    phone,
+                    product_name,
+                    price,
+                    pv,
+                    "",  # 결재방법 (선택사항)
+                    customer_name,
+                    customer_phone,
+                    address,
+                    ""  # 수령확인 (선택사항)
+                ])
+
+        return jsonify({"status": "✅ 주문이 저장되었습니다."})
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
     
 
 
@@ -1111,40 +1123,48 @@ def add_order():
 
 # ✅ 주문 저장 API
 @app.route("/save_order", methods=["POST"])
-def save_order(
-    회원명, 제품명, 제품가격, PV,
-    주문자_고객명=None,
-    주문자_휴대폰번호=None,
-    주문일자=None,
-    결재방법="카드",
-    배송처=None,
-    수령확인="0",
-    ORDER_API_ENDPOINT = os.getenv("ORDER_API_ENDPOINT")
+def save_order():
+    try:
+        data = request.get_json()
 
-):
+        회원명 = data.get("회원명")
+        주문일자 = process_order_date(data.get("주문일자"))
+        제품명 = data.get("제품명")
+        제품가격 = data.get("제품가격")
+        PV = data.get("PV")
+        결재방법 = data.get("결재방법", "카드")
+        주문자_고객명 = data.get("주문자_고객명")
+        주문자_휴대폰번호 = data.get("주문자_휴대폰번호")
+        배송처 = data.get("배송처")
+        수령확인 = data.get("수령확인", "0")
 
+        ORDER_API_ENDPOINT = os.getenv("ORDER_API_ENDPOINT")
 
-    data = {
-        "회원명": 회원명,
-        "주문일자": process_order_date(주문일자),  # ✅ 여기서 날짜 처리 통일
-        "제품명": 제품명,
-        "제품가격": 제품가격,
-        "PV": PV,
-        "결재방법": 결재방법,
-        "주문자_고객명": 주문자_고객명,
-        "주문자_휴대폰번호": 주문자_휴대폰번호,
-        "배송처": 배송처,
-        "수령확인": 수령확인
-    }
+        payload = {
+            "회원명": 회원명,
+            "주문일자": 주문일자,
+            "제품명": 제품명,
+            "제품가격": 제품가격,
+            "PV": PV,
+            "결재방법": 결재방법,
+            "주문자_고객명": 주문자_고객명,
+            "주문자_휴대폰번호": 주문자_휴대폰번호,
+            "배송처": 배송처,
+            "수령확인": 수령확인
+        }
 
-    response = requests.post(endpoint, json=data)
+        response = requests.post(ORDER_API_ENDPOINT, json=payload)
 
-    if response.status_code == 200:
-        print("✅ 주문 저장 성공:", response.json())
-        return response.json()
-    else:
-        print("❌ 주문 저장 실패:", response.status_code, response.text)
-        return None
+        if response.status_code == 200:
+            print("✅ 주문 저장 성공:", response.json())
+            return jsonify(response.json()), 200
+        else:
+            print("❌ 주문 저장 실패:", response.status_code, response.text)
+            return jsonify({"status": "error", "message": response.text}), 500
+
+    except Exception as e:
+        print("❌ 예외 발생:", str(e))
+        return jsonify({"status": "error", "message": str(e)}), 500
 
     
 
@@ -1297,6 +1317,8 @@ def delete_order_confirm():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
 
 
 
