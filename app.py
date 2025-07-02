@@ -484,7 +484,7 @@ def register_member():
 
     print(f"[4] ✅ 시트 헤더: {headers}")
 
-    for i, row in enumerate(data_rows):
+    for i, row in enumerate(rows):
         if row.get("회원명") == name:
             print(f"[5] ⚠️ 기존 회원 '{name}' 발견 → 덮어쓰기")
             for key, value in {"회원명": name, "회원번호": number}.items():
