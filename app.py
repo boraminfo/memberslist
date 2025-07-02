@@ -1126,52 +1126,6 @@ def parse_and_save_order():
 
 
 
-# ✅ 주문 저장 API
-@app.route("/save_order", methods=["POST"])
-def save_order():
-    try:
-        data = request.get_json()
-
-        회원명 = data.get("회원명")
-        주문일자 = process_order_date(data.get("주문일자"))
-        제품명 = data.get("제품명")
-        제품가격 = data.get("제품가격")
-        PV = data.get("PV")
-        결재방법 = data.get("결재방법", "카드")
-        주문자_고객명 = data.get("주문자_고객명")
-        주문자_휴대폰번호 = data.get("주문자_휴대폰번호")
-        배송처 = data.get("배송처")
-        수령확인 = data.get("수령확인", "0")
-
-        ORDER_API_ENDPOINT = os.getenv("ORDER_API_ENDPOINT")
-
-        payload = {
-            "회원명": 회원명,
-            "주문일자": 주문일자,
-            "제품명": 제품명,
-            "제품가격": 제품가격,
-            "PV": PV,
-            "결재방법": 결재방법,
-            "주문자_고객명": 주문자_고객명,
-            "주문자_휴대폰번호": 주문자_휴대폰번호,
-            "배송처": 배송처,
-            "수령확인": 수령확인
-        }
-
-        response = requests.post(ORDER_API_ENDPOINT, json=payload)
-
-        if response.status_code == 200:
-            print("✅ 주문 저장 성공:", response.json())
-            return jsonify(response.json()), 200
-        else:
-            print("❌ 주문 저장 실패:", response.status_code, response.text)
-            return jsonify({"status": "error", "message": response.text}), 500
-
-    except Exception as e:
-        print("❌ 예외 발생:", str(e))
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-    
 
 
 
@@ -1329,39 +1283,8 @@ def delete_order_confirm():
 
 
 
-@app.route("/save_order_batch", methods=["POST"])
-def save_order_batch():
-    try:
-        orders = request.get_json()
-        sheet = get_order_sheet()
-        rows_to_append = []
-
-        for order in orders:
-            회원명 = order.get("회원명")
-            회원번호, 회원_휴대폰 = get_member_info(회원명)
-
-            row = [
-                order.get("주문일자", ""),
-                회원명,
-                회원번호,
-                회원_휴대폰,
-                order.get("제품명", ""),
-                order.get("제품가격", ""),
-                order.get("PV", ""),
-                order.get("결재방법", "카드"),
-                order.get("주문자_고객명", ""),
-                order.get("주문자_휴대폰번호", ""),
-                order.get("배송처", ""),
-                order.get("수령확인", "0")
-            ]
-            rows_to_append.append(row)
-
-        sheet.insert_rows(rows_to_append, row=2, value_input_option="USER_ENTERED")
-        return jsonify({"message": f"{len(rows_to_append)}건 저장 완료"}), 200
 
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
 
@@ -1409,6 +1332,40 @@ orders = [
 
 
 
+
+# 주문 저장 엔드포인트
+@app.route("/add_orders", methods=["POST"])
+def add_orders():
+    data = request.json
+    회원명 = data.get("회원명")
+    orders = data.get("orders", [])
+
+    try:
+        spreadsheet = client.open("members_list_main")
+        sheet = spreadsheet.worksheet("제품주문")
+
+        for order in orders:
+            row = [
+                datetime.now().strftime("%Y-%m-%d"),
+                회원명,
+                order.get("제품명"),
+                order.get("제품가격"),
+                order.get("PV"),
+                order.get("결재방법", ""),
+                order.get("주문자_고객명"),
+                order.get("주문자_휴대폰번호"),
+                order.get("배송처"),
+                order.get("수령확인", "")
+            ]
+            sheet.append_row(row, value_input_option="USER_ENTERED")
+
+        return jsonify({"status": "success", "message": "주문이 저장되었습니다."})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
 
 
 
