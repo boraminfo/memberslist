@@ -1052,66 +1052,7 @@ def handle_order_save(data):
 
 
 
-# ✅ 제품 주문 등록 API
-@app.route("/parse_and_save_order", methods=["POST"])
-def parse_and_save_order():
-    try:
-        raw_text = request.get_json().get("text", "")
-        member_name_match = re.search(r"회원명\s*(\S+)\s*제품주문 저장", raw_text)
-        if not member_name_match:
-            return jsonify({"error": "회원명을 찾을 수 없습니다."}), 400
 
-        member_name = member_name_match.group(1)
-        raw_orders = raw_text.replace(f"회원명 {member_name} 제품주문 저장", "").strip()
-        order_lines = [line.strip() for line in raw_orders.split('\n') if line.strip()]
-
-        # 🔍 회원 정보 가져오기
-        member_sheet = get_member_sheet()
-        members = member_sheet.get_all_records()
-        member_info = next((m for m in members if m.get("회원명") == member_name), None)
-
-        if not member_info:
-            return jsonify({"error": f"{member_name} 회원을 찾을 수 없습니다."}), 404
-
-        phone = member_info.get("휴대폰번호", "")
-        member_no = member_info.get("회원번호", "")
-
-        # 🧾 주문 시트
-        order_sheet = get_product_order_sheet()
-
-        for line in order_lines:
-            product_match = re.search(r"(.+?)\s(\d+)개\s([\d,]+)원\s([\d,]+)PV\s+(\S+)\s+(\d{3}-\d{4}-\d{4})\s+(.+)", line)
-            if not product_match:
-                continue
-
-            product_name = product_match.group(1).strip()
-            quantity = int(product_match.group(2))
-            price = product_match.group(3).replace(",", "")
-            pv = product_match.group(4).replace(",", "")
-            customer_name = product_match.group(5).strip()
-            customer_phone = product_match.group(6).strip()
-            address = product_match.group(7).strip()
-
-            for _ in range(quantity):
-                order_sheet.append_row([
-                    datetime.today().strftime("%Y-%m-%d"),  # 주문일자
-                    member_name,
-                    member_no,
-                    phone,
-                    product_name,
-                    price,
-                    pv,
-                    "",  # 결재방법 (선택사항)
-                    customer_name,
-                    customer_phone,
-                    address,
-                    ""  # 수령확인 (선택사항)
-                ])
-
-        return jsonify({"status": "✅ 주문이 저장되었습니다."})
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
 
 
     
@@ -1130,25 +1071,6 @@ def parse_and_save_order():
 
 
 
-
-
-def normalize_order_fields(data: dict) -> dict:
-    result = data.copy()
-
-    # 주문완료란 / 주문상품란 → 제품정보 매핑
-    for prefix in ["주문완료", "주문상품"]:
-        if f"{prefix}_제품명" in data:
-            result["제품명"] = data.get(f"{prefix}_제품명", "")
-            result["제품가격"] = data.get(f"{prefix}_제품가격", "")
-            result["PV"] = data.get(f"{prefix}_PV", "")
-
-    # 배송지란 → 주문자 정보 매핑
-    if "배송지_이름" in data:
-        result["주문자_고객명"] = data.get("배송지_이름", "")
-        result["주문자_휴대폰번호"] = data.get("배송지_휴대폰번호", "")
-        result["배송처"] = data.get("배송지_주소", "")
-
-    return result
 
 
 # ✅ 주문일자 처리
@@ -1402,7 +1324,139 @@ def save_order_from_json():
 
 
 
-# 수정했는데
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 날짜 파싱
+def parse_date(text):
+    today = datetime.today()
+    if "오늘" in text:
+        return today.strftime("%Y-%m-%d")
+    elif "어제" in text:
+        return (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        match = re.search(r"(20\d{2}[./-]\d{1,2}[./-]\d{1,2})", text)
+        if match:
+            return re.sub(r"[./]", "-", match.group(1))
+    return today.strftime("%Y-%m-%d")
+
+# ✅ 자연어 문장 파싱
+def parse_order_text(text):
+    result = {}
+
+    # 1. 회원명
+    match = re.match(r"(\S+)(?:님)?", text)
+    if match:
+        result["회원명"] = match.group(1)
+
+    # 2. 제품명 + 수량
+    prod_match = re.search(r"([\w가-힣]+)[\s]*(\d+)\s*개", text)
+    if prod_match:
+        result["제품명"] = prod_match.group(1)
+        result["수량"] = int(prod_match.group(2))
+    else:
+        result["제품명"] = "제품"
+        result["수량"] = 1
+
+    # 3. 결제방법
+    if "카드" in text:
+        result["결재방법"] = "카드"
+    elif "현금" in text:
+        result["결재방법"] = "현금"
+    elif "계좌" in text:
+        result["결재방법"] = "계좌이체"
+    else:
+        result["결재방법"] = "카드"
+
+    # 4. 주소 or 배송지
+    address_match = re.search(r"(?:주소|배송지)[:：]\s*(.+?)(\s|$)", text)
+    if address_match:
+        result["배송처"] = address_match.group(1).strip()
+    else:
+        result["배송처"] = ""
+
+    # 5. 주문일자
+    result["주문일자"] = parse_date(text)
+
+    return result
+
+# ✅ 주문 저장
+def save_order_to_sheet(parsed):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
+    sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    client = gspread.authorize(creds)
+
+    ss = client.open(sheet_title)
+    db_sheet = ss.worksheet("DB")
+    order_sheet = ss.worksheet("제품주문")
+
+    # 회원 정보 조회
+    members = db_sheet.get_all_records()
+    회원명 = parsed["회원명"]
+    회원번호 = ""
+    회원_휴대폰 = ""
+    for m in members:
+        if m.get("회원명") == 회원명:
+            회원번호 = m.get("회원번호", "")
+            회원_휴대폰 = m.get("휴대폰번호", "")
+            break
+
+    for _ in range(parsed.get("수량", 1)):
+        row = [
+            parsed.get("주문일자"),
+            회원명,
+            회원번호,
+            회원_휴대폰,
+            parsed.get("제품명"),
+            "0",  # 제품가격
+            "0",  # PV
+            parsed.get("결재방법"),
+            회원명,
+            회원_휴대폰,
+            parsed.get("배송처"),
+            "0"
+        ]
+        order_sheet.insert_row(row, 2, value_input_option="USER_ENTERED")
+
+# ✅ API 엔드포인트
+@app.route("/parse_and_save_order", methods=["POST"])
+def parse_and_save_order():
+    try:
+        user_input = request.json.get("text", "")
+        parsed = parse_order_text(user_input)
+        save_order_to_sheet(parsed)
+        return jsonify({
+            "status": "success",
+            "message": f"{parsed['회원명']}님의 주문이 저장되었습니다.",
+            "parsed": parsed
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
 
 
 
