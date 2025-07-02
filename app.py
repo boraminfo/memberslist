@@ -564,7 +564,7 @@ def save_member():
         if not name:
             name = 회원명_입력값.strip()
 
-        # 4. 등록 키워드 제거
+        # ✅ 4. 등록 키워드 제거 (항상 실행)
         등록문구_패턴 = r"\s*(회원등록|신규회원 등록|회원 추가)$"
         name = re.sub(등록문구_패턴, "", name).strip()
 
@@ -615,6 +615,13 @@ def save_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+# 변경잉 있어
+
+
+
+
+
 
 
 
