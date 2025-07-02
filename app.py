@@ -554,8 +554,10 @@ def save_member():
     try:
         # 1. 요청값 정리
         req_raw = request.get_json()
+
         req = {k.strip(): v.strip() if isinstance(v, str) else v for k, v in req_raw.items()}
-        name = req.get("회원명", "").strip()
+        name = re.sub(r"\s*등록$", "", req.get("회원명", "")).strip()
+    
         number = req.get("회원번호", "").strip().lower()
         요청문_raw = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
 
