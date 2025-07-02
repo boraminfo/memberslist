@@ -553,9 +553,16 @@ def register_member():
 def save_member():
     try:
         # 1. 요청값 수신 및 정리
+
         req_raw = request.get_json()
         요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
         회원명_입력값 = req_raw.get("회원명", "")
+
+        # ✅ 등록 키워드가 앞에 오는 경우 제거 ('회원등록 강민지' → '강민지')
+        등록문구_앞패턴 = r"^(회원등록|신규회원 등록|회원 추가)\s+"
+        요청문 = re.sub(등록문구_앞패턴, "", 요청문).strip()
+        회원명_입력값 = re.sub(등록문구_앞패턴, "", 회원명_입력값).strip()
+
 
         # 2. 자연어 등록 명령 파싱
         name, number = parse_registration(요청문 or 회원명_입력값)
@@ -617,6 +624,7 @@ def save_member():
         return jsonify({"error": str(e)}), 500
 
 # 변경잉 있어
+
 
 
 
