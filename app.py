@@ -1345,7 +1345,9 @@ def add_orders():
         sheet = spreadsheet.worksheet("제품주문")
         
         # 2행에 빈 행 추가
-        sheet.insert_row([""], 2)
+        sheet.insert_rows([[""] * 10] * len(orders), row=2)
+        row_index = 2
+
 
         for order in orders:
             row = [
@@ -1360,7 +1362,8 @@ def add_orders():
                 order.get("배송처"),
                 order.get("수령확인", "")
             ]
-            sheet.append_row(row, value_input_option="USER_ENTERED")
+            sheet.insert_row(row, row_index)
+            row_index += 1
 
         return jsonify({"status": "success", "message": "주문이 저장되었습니다."})
 
