@@ -396,17 +396,19 @@ def update_member():
 
 
 
-# ✅ 회원 시트 접근 함수
-def get_member_sheet():
-    return get_worksheet("DB")  # 시트 탭 이름에 맞게 수정
-
-
-
 # ✅ 회원 등록 명령 파싱 함수
 def parse_registration(text):
     import re
     text = text.strip()
     print(f"[🔍DEBUG] 입력 text: '{text}'")
+
+    # ✅ 여기에 추가
+    if "회원명" in text and "등록" in text:
+        match = re.search(r"회원명\s*[:：]?\s*([\w가-힣\s]+)", text)
+        if match:
+            name = match.group(1).strip()
+            print(f"[✅DEBUG] 형식0 매칭 → name: '{name}', number: None")
+            return name, None
 
     # 형식 1
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
@@ -477,8 +479,9 @@ def register_member():
         print(f"[4] ❌ 시트 접근 실패: {e}")
         return jsonify({"error": "시트 접근 실패"}), 500
 
-    data_rows = sheet.get_all_records()
     headers = sheet.row_values(1)
+    rows = sheet.get_all_records()
+
     print(f"[4] ✅ 시트 헤더: {headers}")
 
     for i, row in enumerate(data_rows):
