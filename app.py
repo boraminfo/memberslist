@@ -920,89 +920,8 @@ def search_memo_by_tags():
 
 
 
-
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ✅ 제품주문 시트
-
-# ✅ 인증 처리
-# ✅ Google Sheets 연동 함수
-
-
-# ✅ 주문내역 시트 가져오기
-sheet = get_worksheet("제품주문")
-
-
-# ✅ 주문일자 처리 함수 (먼저 정의되어야 함)
-# ✅ 주문일자 처리 함수 (수식 및 누락 방지)
-# ✅ 주문일자 처리 함수 (자연어 + 문자열 고정)
-from datetime import datetime, timedelta
-
-# ✅ 오늘 날짜를 실제 문자열로 반환하는 함수
-def process_order_date(raw_date: str) -> str:
-    try:
-        if not raw_date or raw_date.strip() == "":
-            return now_kst().strftime('%Y-%m-%d')
-
-        raw_date = raw_date.strip()
-
-        if "오늘" in raw_date:
-            return now_kst().strftime('%Y-%m-%d')
-        elif "어제" in raw_date:
-            return (now_kst() - timedelta(days=1)).strftime('%Y-%m-%d')
-        elif "내일" in raw_date:
-            return (now_kst() + timedelta(days=1)).strftime('%Y-%m-%d')
-
-        # 날짜 형식 유효성 검사
-        datetime.strptime(raw_date, "%Y-%m-%d")
-        return raw_date
-
-    except Exception:
-        return now_kst().strftime('%Y-%m-%d')
-
-
-
-
-
-# ✅ 주문 데이터 추가 함수
-def insert_order_row(sheet, order_data):
-    row = [
-        process_order_date(data.get("주문일자", "")),
-        order_data.get('회원명', ''),
-        order_data.get('회원번호', ''),
-        order_data.get('휴대폰번호', ''),
-        order_data.get('제품명', ''),
-        order_data.get('제품가격', ''),
-        order_data.get('PV', ''),
-        order_data.get('결재방법', ''),
-        order_data.get('주문자_고객명', ''),
-        order_data.get('주문자_휴대폰번호', ''),
-        order_data.get('배송처', ''),
-        order_data.get('수령확인', '')
-    ]
-    sheet.append_row(row)
-
-
-
-
-
-
-
-
 # ✅ 공통 주문 저장 함수
+
 # ✅ 주문 저장 함수
 def handle_order_save(data):
     sheet = get_worksheet("제품주문")
@@ -1071,7 +990,7 @@ def handle_order_save(data):
 
 
 
-
+# ✅ 제품주문시 날짜 입력으로 등록처리 
 
 # ✅ 주문일자 처리
 def process_order_date(raw_date: str) -> str:
@@ -1206,7 +1125,7 @@ def delete_order_confirm():
 
 
 
-
+# ✅ 아이패드에서 이미지 입력으로 제품주문처리 이미지 json으로 처리
 
 # 주문 저장 엔드포인트
 @app.route("/add_orders", methods=["POST"])
@@ -1277,7 +1196,7 @@ def add_orders():  # ← 누락된 함수 선언 추가
 
 
 
-
+# ✅ 컴퓨터에서 이미지 입력으로 제품주문처리
 
 def get_worksheet(sheet_name):
     sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # env에서 불러옴
@@ -1339,6 +1258,7 @@ def save_order_from_json():
 
 
 
+# ✅ 음성으로 제품등록 
 
 # ✅ 날짜 파싱
 def parse_date(text):
