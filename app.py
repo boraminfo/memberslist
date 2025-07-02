@@ -1293,48 +1293,7 @@ def delete_order_confirm():
 
 
 
-# 시트 열기
-spreadsheet = client.open("members_list_main")  # 스프레드시트 이름
-sheet = spreadsheet.worksheet("제품주문")     # 워크시트 이름
-
-
-def 저장_주문(회원명, orders):
-    for order in orders:
-        row = [
-            datetime.now().strftime("%Y-%m-%d"),  # 주문일자
-            회원명,                               # 회원명
-            order.get("제품명"),
-            order.get("제품가격"),
-            order.get("PV"),
-            order.get("결재방법", ""),            # 결재방법(옵션)
-            order.get("주문자_고객명"),
-            order.get("주문자_휴대폰번호"),
-            order.get("배송처"),
-            order.get("수령확인", "")             # 수령확인(옵션)
-        ]
-        sheet.append_row(row, value_input_option="USER_ENTERED")
-
-# 사용 예시:
-회원명 = "이태수"
-orders = [
-    {
-        "제품명": "애터미 오롯이 담은 유기농 발효 노니 (1,000g, 병)",
-        "제품가격": 47800,
-        "PV": 24000,
-        "주문자_고객명": "이태수",
-        "주문자_휴대폰번호": "010-2759-9001",
-        "배송처": "경상북도 칠곡군 가산면 복창전원길 85, 1층"
-    },
-    # 다른 주문도 동일한 형식으로 추가
-]
-
-저장_주문(회원명, orders)
-
-
-
-
 # 주문 저장 엔드포인트
-@app.route("/add_orders", methods=["POST"])
 def add_orders():
     data = request.json
     회원명 = data.get("회원명")
@@ -1343,49 +1302,50 @@ def add_orders():
     try:
         spreadsheet = client.open("members_list_main")
         sheet = spreadsheet.worksheet("제품주문")
-        
-        # 2행에 빈 행 추가
+
+        # ✅ DB 시트에서 회원번호, 휴대폰번호 추출
+        db_sheet = spreadsheet.worksheet("DB")
+        member_records = db_sheet.get_all_records()
+
+        회원번호 = ""
+        회원_휴대폰번호 = ""
+        for record in member_records:
+            if record.get("회원명") == 회원명:
+                회원번호 = record.get("회원번호", "")
+                회원_휴대폰번호 = record.get("휴대폰번호", "")
+                break
+
+        # ✅ 주문 내용 시트에 삽입
         if orders:
-            row_index = 2  # 2행부터 삽입
-
-
-        for order in orders:
-            row = [
-                datetime.now().strftime("%Y-%m-%d"),
-                회원명,
-                회원번호,
-                회원_휴대폰번호,
-                order.get("제품명", ""),
-                order.get("제품가격", ""),
-                order.get("PV", ""),
-                order.get("결재방법", ""),
-                order.get("주문자_고객명", ""),
-                order.get("주문자_휴대폰번호", ""),
-                order.get("배송처", ""),
-                order.get("수령확인", "")
-            ]
-            sheet.insert_row(row, row_index)
-            row_index += 1
+            row_index = 2  # 항상 2행부터 위로 삽입
+            for order in orders:
+                row = [
+                    datetime.now().strftime("%Y-%m-%d"),  # 주문일자
+                    회원명,
+                    회원번호,
+                    회원_휴대폰번호,
+                    order.get("제품명", ""),
+                    order.get("제품가격", ""),
+                    order.get("PV", ""),
+                    order.get("결재방법", ""),
+                    order.get("주문자_고객명", ""),
+                    order.get("주문자_휴대폰번호", ""),
+                    order.get("배송처", ""),
+                    order.get("수령확인", "")
+                ]
+                sheet.insert_row(row, row_index)
+                row_index += 1
 
         return jsonify({"status": "success", "message": "주문이 저장되었습니다."})
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+    
 
 
 
 
 
-db_sheet = spreadsheet.worksheet("DB")
-member_records = db_sheet.get_all_records()
-
-회원번호 = ""
-회원_휴대폰번호 = ""
-for record in member_records:
-    if record.get("회원명") == 회원명:
-        회원번호 = record.get("회원번호", "")
-        회원_휴대폰번호 = record.get("휴대폰번호", "")
-        break
 
 
 
