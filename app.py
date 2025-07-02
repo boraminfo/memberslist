@@ -1294,7 +1294,8 @@ def add_orders():  # ← 누락된 함수 선언 추가
     orders = data.get("orders", [])
 
     try:
-        spreadsheet = client.open("members_list_main")
+        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # ← 환경변수에서 시트명 로딩
+        spreadsheet = client.open(sheet_title)
         sheet = spreadsheet.worksheet("제품주문")
 
         # ✅ DB 시트에서 회원번호, 휴대폰번호 추출
@@ -1357,9 +1358,11 @@ def add_orders():  # ← 누락된 함수 선언 추가
 
 
 def get_worksheet(sheet_name):
-    spreadsheet = client.open("members_list_main")
+    sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # env에서 불러옴
+    spreadsheet = client.open(sheet_title)
     worksheet = spreadsheet.worksheet(sheet_name)
     return worksheet
+
 
 def append_row_to_sheet(sheet, row):
     sheet.append_row(row, value_input_option="USER_ENTERED")
@@ -1399,7 +1402,7 @@ def save_order_from_json():
 
 
 
-
+# 수정했는데
 
 
 
