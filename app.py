@@ -1343,6 +1343,9 @@ def add_orders():
     try:
         spreadsheet = client.open("members_list_main")
         sheet = spreadsheet.worksheet("제품주문")
+        
+        # 2행에 빈 행 추가
+        sheet.insert_row([""], 2)
 
         for order in orders:
             row = [
