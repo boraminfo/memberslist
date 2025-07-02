@@ -562,19 +562,24 @@ def save_member():
 
         # 3. Fallback 처리
         if not name:
-            name = re.sub(r"\s*\d{6,}\s*(회원등록|신규회원 등록|회원 추가)$|\s*(회원등록|신규회원 등록|회원 추가)$", "", 회원명_입력값).strip()
+            name = 회원명_입력값.strip()
+
+        # 4. 등록 키워드 제거
+        등록문구_패턴 = r"\s*(회원등록|신규회원 등록|회원 추가)$"
+        name = re.sub(등록문구_패턴, "", name).strip()
+
         if not number:
             number = req_raw.get("회원번호", "").strip()
 
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
-        # 4. 시트 접근
+        # 5. 시트 접근
         sheet = get_member_sheet()
         data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
 
-        # 5. 중복 확인
+        # 6. 중복 확인
         for row in data:
             if str(row.get("회원명", "")).strip() == name:
                 요약 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
@@ -583,7 +588,7 @@ def save_member():
                     "회원정보": 요약
                 }), 200
 
-        # 6. '등록' 문구 포함 여부 확인
+        # 7. 등록 요청 여부 확인
         등록문구 = ["회원등록", "신규회원 등록", "회원 추가"]
         등록요청여부 = any(문구 in 요청문 or 문구 in 회원명_입력값 for 문구 in 등록문구)
 
@@ -610,6 +615,7 @@ def save_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
