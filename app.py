@@ -1345,21 +1345,24 @@ def add_orders():
         sheet = spreadsheet.worksheet("제품주문")
         
         # 2행에 빈 행 추가
-        sheet.insert_rows([[""] * 10] * len(orders), row=2)
-        row_index = 2
+        if orders:
+            sheet.insert_row([""] * 10, 2)
+
 
 
         for order in orders:
             row = [
                 datetime.now().strftime("%Y-%m-%d"),
                 회원명,
-                order.get("제품명"),
-                order.get("제품가격"),
-                order.get("PV"),
+                회원번호,
+                회원_휴대폰번호,
+                order.get("제품명", ""),
+                order.get("제품가격", ""),
+                order.get("PV", ""),
                 order.get("결재방법", ""),
-                order.get("주문자_고객명"),
-                order.get("주문자_휴대폰번호"),
-                order.get("배송처"),
+                order.get("주문자_고객명", ""),
+                order.get("주문자_휴대폰번호", ""),
+                order.get("배송처", ""),
                 order.get("수령확인", "")
             ]
             sheet.insert_row(row, row_index)
@@ -1370,8 +1373,24 @@ def add_orders():
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+
+
+
+
+db_sheet = spreadsheet.worksheet("DB")
+member_records = db_sheet.get_all_records()
+
+회원번호 = ""
+회원_휴대폰번호 = ""
+for record in member_records:
+    if record.get("회원명") == 회원명:
+        회원번호 = record.get("회원번호", "")
+        회원_휴대폰번호 = record.get("휴대폰번호", "")
+        break
+
+
+
+
 
 
 
