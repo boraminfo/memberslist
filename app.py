@@ -16,10 +16,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 
 from utils.sheets import get_order_sheet, get_member_info
 
-
-
 import requests
-
 
 from utils.sheets import get_order_sheet, get_member_info
 
@@ -153,6 +150,14 @@ openai.api_key = os.getenv("OPENAI_API_KEY")
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
 client = gspread.authorize(creds)
+
+
+
+
+
+
+
+
 
 
 
@@ -1357,6 +1362,58 @@ def save_order_batch():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+# 시트 열기
+spreadsheet = client.open("members_list_main")  # 스프레드시트 이름
+sheet = spreadsheet.worksheet("제품주문")     # 워크시트 이름
+
+
+def 저장_주문(회원명, orders):
+    for order in orders:
+        row = [
+            datetime.now().strftime("%Y-%m-%d"),  # 주문일자
+            회원명,                               # 회원명
+            order.get("제품명"),
+            order.get("제품가격"),
+            order.get("PV"),
+            order.get("결재방법", ""),            # 결재방법(옵션)
+            order.get("주문자_고객명"),
+            order.get("주문자_휴대폰번호"),
+            order.get("배송처"),
+            order.get("수령확인", "")             # 수령확인(옵션)
+        ]
+        sheet.append_row(row, value_input_option="USER_ENTERED")
+
+# 사용 예시:
+회원명 = "이태수"
+orders = [
+    {
+        "제품명": "애터미 오롯이 담은 유기농 발효 노니 (1,000g, 병)",
+        "제품가격": 47800,
+        "PV": 24000,
+        "주문자_고객명": "이태수",
+        "주문자_휴대폰번호": "010-2759-9001",
+        "배송처": "경상북도 칠곡군 가산면 복창전원길 85, 1층"
+    },
+    # 다른 주문도 동일한 형식으로 추가
+]
+
+저장_주문(회원명, orders)
+
+
+
+
+
+
+
+
 
 
 
