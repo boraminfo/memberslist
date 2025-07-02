@@ -1347,7 +1347,7 @@ def add_orders():
         # 2행에 빈 행 추가
         if orders:
             sheet.insert_row([""] * 10, 2)
-
+            row_index = 2  # <-- 여기를 if 안에 둬야 함
 
 
         for order in orders:
