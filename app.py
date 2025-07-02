@@ -558,7 +558,6 @@ def save_member():
         회원명_입력값 = req_raw.get("회원명", "")
 
         # 2. 자연어 등록 명령 파싱
-        from your_module import parse_registration  # ← 경로에 맞게 import 필요
         name, number = parse_registration(요청문 or 회원명_입력값)
 
         # 3. Fallback 처리
