@@ -524,6 +524,8 @@ def save_member():
     try:
         # 1. 요청값 수신 및 정리
         req_raw = request.get_json()
+        print(f"[DEBUG] 📥 Raw 요청 수신: {req_raw}")
+
         요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
         회원명_입력값 = req_raw.get("회원명", "")
 
@@ -537,12 +539,12 @@ def save_member():
             if len(parts) >= 2:
                 요청문 = ' '.join(parts[1:] + parts[:1])
 
-
         # 2. 자연어 등록 명령 파싱
         name, number = parse_registration(요청문 or 회원명_입력값)
 
         # 3. Fallback 처리
         if not name:
+            print(f"[ERROR] ❌ 이름 파싱 실패 — 요청문: '{요청문}', 회원명_입력값: '{회원명_입력값}'")
             name = 회원명_입력값.strip()
 
         # ✅ 4. 등록 키워드 제거 (항상 실행)
@@ -555,30 +557,28 @@ def save_member():
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
-
         # ✅ 휴대폰번호 추출
         휴대폰번호_패턴 = r"(010[-\d]{7,})"
         휴대폰번호 = ""
         for text in [요청문, 회원명_입력값]:
             match = re.search(휴대폰번호_패턴, text)
             if match:
-                휴대폰번호 = match.group(1)  # ✅ 하이픈 유지
+                휴대폰번호 = match.group(1)
                 break
 
-
-
-
-
+        print(f"[DEBUG] 📝 최종 등록 데이터: 이름={name}, 번호={number}, 휴대폰번호={휴대폰번호}")
 
         # 5. 시트 접근
         sheet = get_member_sheet()
         data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
+        print(f"[DEBUG] 📄 시트 헤더: {headers}")
 
         # 6. 중복 확인
         for row in data:
             if str(row.get("회원명", "")).strip() == name:
                 요약 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
+                print(f"[INFO] ⚠️ 이미 등록된 회원 발견: {요약}")
                 return jsonify({
                     "message": f"이미 등록된 회원 '{name}'입니다.",
                     "회원정보": 요약
@@ -587,6 +587,7 @@ def save_member():
         # 7. 등록 요청 여부 확인
         등록문구 = ["회원등록", "신규회원 등록", "회원 추가"]
         등록요청여부 = any(문구 in 요청문 or 문구 in 회원명_입력값 for 문구 in 등록문구)
+        print(f"[DEBUG] 🔍 등록 요청 여부 판단: 요청문='{요청문}', 회원명_입력값='{회원명_입력값}', 결과={등록요청여부}")
 
         if 등록요청여부:
             new_row = [''] * len(headers)
@@ -594,29 +595,30 @@ def save_member():
                 new_row[headers.index("회원명")] = name
             if "회원번호" in headers:
                 new_row[headers.index("회원번호")] = number
-
             if "휴대폰번호" in headers:
                 new_row[headers.index("휴대폰번호")] = 휴대폰번호
-
-
 
             for key, value in req_raw.items():
                 if key in headers and key not in ["회원명", "회원번호"]:
                     new_row[headers.index(key)] = value
 
+            print(f"[DEBUG] ➕ 신규 회원 행 추가: {new_row}")
             sheet.insert_row(new_row, 2)
             return jsonify({
                 "message": f"{name} 회원 신규 등록 완료" + (f" (회원번호 {number})" if number else "")
             }), 200
         else:
+            print(f"[WARN] ⛔ 등록 키워드 없음 — 요청 거절")
             return jsonify({
                 "message": f"'{name}' 회원은 등록되지 않았습니다. '회원등록', '신규회원 등록', '회원 추가' 문구가 포함되어야 합니다."
             }), 400
 
     except Exception as e:
         import traceback
+        print("[FATAL] ❗예외 발생:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
