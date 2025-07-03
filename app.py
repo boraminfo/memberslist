@@ -562,8 +562,20 @@ def save_member():
         for text in [요청문, 회원명_입력값]:
             match = re.search(휴대폰번호_패턴, text)
             if match:
-                휴대폰번호 = match.group(1).replace("-", "")
+                휴대폰번호 = match.group(1)  # ✅ 하이픈 유지
                 break
+
+
+        # 계보도 추출 (예: 'A라인', 'B라인' 등 특정 키워드 기준)
+        계보도_패턴 = r"\b([A-Z가-힣]{1,10}라인)\b"
+        계보도 = ""
+        for text in [요청문, 회원명_입력값]:
+            match = re.search(계보도_패턴, text)
+            if match:
+                계보도 = match.group(1)
+                break
+
+
 
 
 
@@ -594,6 +606,11 @@ def save_member():
 
             if "휴대폰번호" in headers:
                 new_row[headers.index("휴대폰번호")] = 휴대폰번호
+
+            if "계보도" in headers:
+                new_row[headers.index("계보도")] = 계보도
+
+
 
             for key, value in req_raw.items():
                 if key in headers and key not in ["회원명", "회원번호"]:
