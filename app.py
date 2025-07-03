@@ -515,23 +515,26 @@ def register_member():
 
 
   
-# 잘 돼야 한다
+
 
 
 # ✅ JSON 기반 회원 저장/수정 API
-@app.route('/save_member', methods=['POST'])
 def save_member():
     try:
         # 1. 요청값 수신 및 정리
-
         req_raw = request.get_json()
         요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
         회원명_입력값 = req_raw.get("회원명", "")
 
-        # ✅ 등록 키워드가 앞에 오는 경우 제거 ('회원등록 강민지' → '강민지')
-        등록문구_앞패턴 = r"^(회원등록|신규회원 등록|회원 추가)\s+"
-        요청문 = re.sub(등록문구_앞패턴, "", 요청문).strip()
-        회원명_입력값 = re.sub(등록문구_앞패턴, "", 회원명_입력값).strip()
+        # ✅ 1-1. '회원등록'이 앞에 올 경우 자리바꿈 처리
+        if 회원명_입력값.startswith(("회원등록", "신규회원 등록", "회원 추가")):
+            parts = 회원명_입력값.split()
+            if len(parts) >= 2:
+                회원명_입력값 = ' '.join(parts[1:] + parts[:1])
+        if 요청문.startswith(("회원등록", "신규회원 등록", "회원 추가")):
+            parts = 요청문.split()
+            if len(parts) >= 2:
+                요청문 = ' '.join(parts[1:] + parts[:1])
 
 
         # 2. 자연어 등록 명령 파싱
