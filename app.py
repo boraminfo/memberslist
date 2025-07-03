@@ -555,6 +555,18 @@ def save_member():
         if not name:
             return jsonify({"error": "회원명은 필수입니다"}), 400
 
+
+        # ✅ 휴대폰번호 추출
+        휴대폰번호_패턴 = r"(010[-\d]{7,})"
+        휴대폰번호 = ""
+        for text in [요청문, 회원명_입력값]:
+            match = re.search(휴대폰번호_패턴, text)
+            if match:
+                휴대폰번호 = match.group(1).replace("-", "")
+                break
+
+
+
         # 5. 시트 접근
         sheet = get_member_sheet()
         data = sheet.get_all_records()
@@ -579,6 +591,10 @@ def save_member():
                 new_row[headers.index("회원명")] = name
             if "회원번호" in headers:
                 new_row[headers.index("회원번호")] = number
+
+            if "휴대폰번호" in headers:
+                new_row[headers.index("휴대폰번호")] = 휴대폰번호
+
             for key, value in req_raw.items():
                 if key in headers and key not in ["회원명", "회원번호"]:
                     new_row[headers.index(key)] = value
@@ -597,7 +613,7 @@ def save_member():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-# 변경잉 있어
+
 
 
 
