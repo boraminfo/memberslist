@@ -398,10 +398,12 @@ def update_member():
 
 # ✅ 회원 등록 명령 파싱 함수
 # ✅ 통합 파싱 함수 (4유형 입력 + 휴대폰 + 계보도)
+
+# ✅ 통합 파싱 함수 (디버깅 포함)
 from flask import request, jsonify
 import re
 
-# ✅ 통합 파싱 함수 (디버깅 포함)
+# ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
 def parse_registration(text):
     text = text.strip()
     print(f"[🔍DEBUG] 입력 text: '{text}'")
@@ -424,46 +426,41 @@ def parse_registration(text):
         if match:
             name = match.group(1).strip()
             print(f"[✅DEBUG] 형식0 매칭 → name: '{name}'")
-            # 계보도 추정
-            if korean_words and korean_words[-1] != name:
-                lineage = korean_words[-1]
-            return name, None, phone, lineage
+            return name, None, phone, ""
 
     # ✅ 형식 1: '김철수 회원번호 12345678'
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
     if match:
         name, number = match.group(1).strip(), match.group(2).strip()
         print(f"[✅DEBUG] 형식1 매칭 → name: '{name}', number: '{number}'")
-        if korean_words and korean_words[-1] != name:
-            lineage = korean_words[-1]
-        return name, number, phone, lineage
+    else:
+        # ✅ 형식 2: '김철수 12345678 등록'
+        match = re.search(r"(.+?)\s+(\d{6,})", text)
+        if match and "등록" in text:
+            name, number = match.group(1).strip(), match.group(2).strip()
+            print(f"[✅DEBUG] 형식2 매칭 → name: '{name}', number: '{number}'")
+        else:
+            # ✅ 형식 3: '김철수 등록'
+            match = re.search(r"^([\w가-힣\s]+?)\s*등록$", text)
+            if match:
+                name = match.group(1).strip()
+                print(f"[✅DEBUG] 형식3 매칭 → name: '{name}'")
 
-    # ✅ 형식 2: '김철수 12345678 등록'
-    match = re.search(r"(.+?)\s+(\d{6,})", text)
-    if match and "등록" in text:
-        name, number = match.group(1).strip(), match.group(2).strip()
-        print(f"[✅DEBUG] 형식2 매칭 → name: '{name}', number: '{number}'")
-        if korean_words and korean_words[-1] != name:
-            lineage = korean_words[-1]
-        return name, number, phone, lineage
+    # ✅ 계보도 추정 (불필요 키워드 제외)
+    불필요_계보도 = ["회원등록", "신규회원", "회원", "등록"]
+    계보도_후보 = [w for w in korean_words if w not in 불필요_계보도 and w != name]
+    if 계보도_후보:
+        lineage = 계보도_후보[-1]
 
-    # ✅ 형식 3: '김철수 등록'
-    match = re.search(r"^([\w가-힣\s]+?)\s*등록$", text)
-    if match:
-        name = match.group(1).strip()
-        print(f"[✅DEBUG] 형식3 매칭 → name: '{name}'")
-        if korean_words and korean_words[-1] != name:
-            lineage = korean_words[-1]
-        return name, None, phone, lineage
-
-    # ✅ fallback: 한글 첫 단어 = 이름, 마지막 단어 = 계보도
-    if korean_words:
+    # ✅ fallback 로그
+    if not name and korean_words:
         name = korean_words[0]
-        if len(korean_words) > 1:
-            lineage = korean_words[-1] if korean_words[-1] != name else ""
-        print(f"[ℹ️DEBUG] fallback 적용 → name: {name}, lineage: {lineage}")
+        print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
 
+    print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
+
+
 
 
 
@@ -1443,6 +1440,8 @@ def parse_and_save_order():
 
 
 
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 
