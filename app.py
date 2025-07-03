@@ -567,13 +567,15 @@ def save_member():
 
 
         # 계보도 추출 (예: 'A라인', 'B라인' 등 특정 키워드 기준)
-        계보도_패턴 = r"\b([가-힣A-Za-z]{1,10}(?:\s?[좌우]측)?|[가-힣A-Za-z]{1,10}라인)\b"
+        계보도_패턴 = r"\b([가-힣]{2,10}\s?(좌측|우측)|[가-힣A-Z]{1,10}라인)\b"
+
 
         계보도 = ""
         for text in [요청문, 회원명_입력값]:
             match = re.search(계보도_패턴, text)
             if match:
-                계보도 = match.group(1)
+                계보도 = match.group(0)  # ← .group(0) 전체 문자열 그대로 추출
+                break
 
 
 
