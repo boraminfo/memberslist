@@ -519,6 +519,7 @@ def register_member():
 
 
 # ✅ JSON 기반 회원 저장/수정 API
+@app.route('/save_member', methods=['POST'])
 def save_member():
     try:
         # 1. 요청값 수신 및 정리
