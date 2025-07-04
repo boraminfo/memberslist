@@ -399,8 +399,10 @@ def update_member():
 
 
 
-# 변경사항이 있어
 
+@app.route('/')
+def index():
+    return render_template('chat.html')  # 위 HTML을 chat.html로 저장
 
 
 # ==========================================================================================================
