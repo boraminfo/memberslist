@@ -417,18 +417,15 @@ def update_member():
 
 # ✅ 명령어에서 회원명, 회원번호 추출
 # ✅ 회원 등록 명령 파싱 함수
-# ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
+# ✅ 통합 파싱 함수 (개선된 정규식 + 안정성 보강)
 def parse_registration(text):
-
     text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
-
     print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
-
 
     name = number = phone = lineage = ""
 
-    # ✅ 휴대폰번호 추출
-    phone_match = re.search(r"010[-\d]{7,}", text)
+    # ✅ 휴대폰번호 추출 (01012345678, 010-1234-5678 등 허용)
+    phone_match = re.search(r"010[-]?\d{4}[-]?\d{4}", text)
     if phone_match:
         phone = phone_match.group(0)
         print(f"[DEBUG] 📱 휴대폰번호 추출: {phone}")
@@ -437,41 +434,46 @@ def parse_registration(text):
     korean_words = re.findall(r"[가-힣]{2,}", text)
     print(f"[DEBUG] 🈶 한글 단어들: {korean_words}")
 
-    # ✅ 이름 + 회원번호
-    match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
+    # ✅ 이름 + 회원번호 추출
+    match = re.search(r"(?:회원등록\s*)?([가-힣]{2,10})\s*회원번호\s*(\d+)", text)
     if match:
         name, number = match.group(1).strip(), match.group(2).strip()
         print(f"[✅DEBUG] 회원번호 형식 매칭 → name: '{name}', number: '{number}'")
     else:
-        # ✅ 이름 + 번호 + '회원등록'
-        match = re.search(r"(.+?)\s+(\d{6,})", text)
+        # ✅ 이름 + 번호 + '회원등록' 포함 시 추출
+        match = re.search(r"([가-힣]{2,10})\s+(\d{6,})", text)
         if match and "회원등록" in text:
             name, number = match.group(1).strip(), match.group(2).strip()
             print(f"[✅DEBUG] 번호 포함 등록 형식 → name: '{name}', number: '{number}'")
         else:
             # ✅ 이름만 + '회원등록'
-            match = re.search(r"^([\w가-힣\s]+?)\s*회원등록$", text)
+            match = re.search(r"^([가-힣]{2,10})\s*회원등록$", text)
             if match:
                 name = match.group(1).strip()
                 print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
-
-    # ✅ 계보도 추정
-    위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
-    불필요_계보도 = ["회원등록", "회원", "등록"]
-    필터링된 = [
-        w for w in korean_words
-        if w not in 불필요_계보도 and w != name and w not in name
-    ]
-
-    if len(필터링된) >= 2 and 필터링된[-1] in 위치어:
-        lineage = f"{필터링된[-2]} {필터링된[-1]}"
-    elif 필터링된:
-        lineage = 필터링된[-1]
 
     # ✅ fallback 이름
     if not name and korean_words:
         name = korean_words[0]
         print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
+
+    # ✅ fallback 회원번호
+    if not number:
+        number = str(uuid.uuid4())[:8]
+        print(f"[ℹ️DEBUG] fallback 회원번호 생성: {number}")
+
+    # ✅ 계보도 추정
+    위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
+    불필요_계보도 = ["회원등록", "회원", "등록"]
+    필터링된 = [w for w in korean_words if w not in 불필요_계보도]
+
+    if name:
+        필터링된 = [w for w in 필터링된 if w not in name]
+
+    if len(필터링된) >= 2 and 필터링된[-1] in 위치어:
+        lineage = f"{필터링된[-2]} {필터링된[-1]}"
+    elif 필터링된:
+        lineage = 필터링된[-1]
 
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
@@ -483,83 +485,9 @@ def parse_registration(text):
 
 
 
+
 # 예시 시트 함수 (실제 구현에 맞게 교체)
 # ✅ 회원 등록 API
-@app.route("/register", methods=["POST"])
-def register_member():
-    data = request.get_json()
-    print(f"\n[1] ✅ 요청 데이터 수신: {data}")
-
-    text = data.get("text", "")
-    if not text:
-        print("[1] ❌ 'text' 키가 없습니다.")
-        return jsonify({"error": "'text' 키가 없습니다."}), 400
-
-    print(f"[1] ✅ text 내용: '{text}'")
-
-    # 이름, 회원번호, 휴대폰번호, 계보도 추출
-    name, number, phone, lineage = parse_registration(text)
-    print(f"[2] 📦 parse_registration 결과 → name: {name}, number: {number}, phone: {phone}, lineage: {lineage}")
-
-    if not name:
-        print("[3] ❌ 이름 추출 실패")
-        return jsonify({"error": "이름 추출 실패"}), 400
-
-    if not number:
-        import uuid
-        number = str(uuid.uuid4())[:8]
-        print(f"[3] ⚠️ 회원번호 없음 → 기본값 할당: {number}")
-    else:
-        print(f"[3] ✅ 회원번호: {number}")
-
-    try:
-        sheet = get_member_sheet()
-        print("[4] ✅ 시트 접근 성공")
-    except Exception as e:
-        print(f"[4] ❌ 시트 접근 실패: {e}")
-        return jsonify({"error": "시트 접근 실패"}), 500
-
-    headers = sheet.row_values(1)
-    rows = sheet.get_all_records()
-
-    print(f"[4] ✅ 시트 헤더: {headers}")
-
-    for i, row in enumerate(rows):
-        if row.get("회원명") == name:
-            print(f"[5] ⚠️ 기존 회원 '{name}' 발견 → 덮어쓰기")
-            for key, value in {
-                "회원명": name,
-                "회원번호": number,
-                "휴대폰번호": phone,
-                "계보도": lineage
-            }.items():
-                if key in headers:
-                    sheet.update_cell(i + 2, headers.index(key) + 1, value)
-            return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"})
-
-    print(f"[5] 🆕 신규 회원 '{name}' 등록")
-    new_row = [''] * len(headers)
-    for key, value in {
-        "회원명": name,
-        "회원번호": number,
-        "휴대폰번호": phone,
-        "계보도": lineage
-    }.items():
-        try:
-            col_idx = headers.index(key)
-            new_row[col_idx] = value
-        except ValueError:
-            print(f"[5] ⚠️ '{key}' 컬럼이 없음 → 무시됨")
-
-    print(f"[5] 💬 최종 new_row 값: {new_row}")
-    print(f"[4] 헤더 raw: {sheet.row_values(1)}")
-    print(f"[4] 헤더 strip 적용 후: {headers}")
-
-    sheet.append_row(new_row)
-    print(f"[6] ✅ 신규 회원 '{name}' 저장 완료")
-    return jsonify({"message": f"{name} 회원 등록 완료"})
-
-
 
 
   
@@ -576,15 +504,11 @@ def save_member():
         요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
         회원명_입력값 = req_raw.get("회원명", "")
 
-
-        # ✅ '회원명' 필드가 자연어 문장인 경우 바로 요청문으로 활용
+        # 요청문 생성 로직
         if not 요청문 and 회원명_입력값 and any(x in 회원명_입력값 for x in ["회원등록", "신규회원 등록", "회원 추가"]):
             요청문 = 회원명_입력값
         elif not 요청문 and 회원명_입력값:
             요청문 = f"회원등록 {회원명_입력값}"
-
-
-
 
         if 회원명_입력값.startswith(("회원등록", "신규회원 등록", "회원 추가")):
             parts = 회원명_입력값.split()
@@ -595,9 +519,8 @@ def save_member():
             if len(parts) >= 2:
                 요청문 = ' '.join(parts[1:] + parts[:1])
 
-        # ✅ 통합 파서 활용
+        # 파서 실행
         name, number, 휴대폰번호, 계보도 = parse_registration(요청문 or 회원명_입력값)
-
         if not name:
             print(f"[ERROR] ❌ 이름 파싱 실패 — 요청문: '{요청문}', 회원명_입력값: '{회원명_입력값}'")
             name = 회원명_입력값.strip()
@@ -618,22 +541,11 @@ def save_member():
         headers = [h.strip() for h in sheet.row_values(1)]
         print(f"[DEBUG] 📄 시트 헤더: {headers}")
 
-        for row in data:
-            if str(row.get("회원명", "")).strip() == name:
-                요약 = {k: row.get(k, "") for k in ["회원명", "회원번호", "휴대폰번호", "주소"] if k in row}
-                print(f"[INFO] ⚠️ 이미 등록된 회원 발견: {요약}")
-                return jsonify({
-                    "message": f"이미 등록된 회원 '{name}'입니다.",
-                    "회원정보": 요약
-                }), 200
+        # 기존 회원 존재 여부 확인
+        member_exists = any(str(row.get("회원명", "")).strip() == name for row in data)
 
-        등록문구 = ["회원등록", "신규회원 등록", "회원 추가"]
-        등록요청여부 = any(문구 in 요청문 or 문구 in 회원명_입력값 for 문구 in 등록문구)
-        print(f"[DEBUG] 🔍 등록 요청 여부 판단: 요청문='{요청문}', 회원명_입력값='{회원명_입력값}', 결과={등록요청여부}")
-
-        if 등록요청여부:
-
-
+        if not member_exists:
+            print(f"[DEBUG] 🆕 시트에 '{name}' 없음 → 신규 등록 수행")
             new_row = [''] * len(headers)
             if "회원명" in headers:
                 new_row[headers.index("회원명")] = name
@@ -655,16 +567,18 @@ def save_member():
             }), 200
 
         else:
-            print(f"[WARN] ⛔ 등록 키워드 없음 — 요청 거절")
+            print(f"[INFO] ⚠️ '{name}'은 이미 등록되어 있어 등록 생략")
             return jsonify({
-                "message": f"'{name}' 회원은 등록되지 않았습니다. '회원등록', '신규회원 등록', '회원 추가' 문구가 포함되어야 합니다."
-            }), 400
+                "message": f"이미 등록된 회원 '{name}'입니다.",
+                "회원정보": {"회원명": name, "회원번호": number, "휴대폰번호": 휴대폰번호}
+            }), 200
 
     except Exception as e:
         import traceback
         print("[FATAL] ❗예외 발생:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
     
 
 
