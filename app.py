@@ -490,7 +490,7 @@ def parse_registration(text):
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or "", number or "", phone or "", lineage or ""
 
-    # return name or None, number or None, phone or None, lineage or None
+ 
 
 
 
