@@ -400,8 +400,7 @@ def update_member():
 # ✅ 통합 파싱 함수 (4유형 입력 + 휴대폰 + 계보도)
 
 # ✅ 통합 파싱 함수 (디버깅 포함)
-from flask import request, jsonify
-import re
+
 
 # ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
 def parse_registration(text):
