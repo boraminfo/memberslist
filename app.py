@@ -499,22 +499,23 @@ def parse_registration(text):
 def save_member():
     try:
         req = request.get_json()
-        print(f"[DEBUG] 요청 데이터: {req}")
+        print(f"[DEBUG] 📥 요청 수신: {req}")
 
         요청문 = req.get("요청문") or req.get("회원명", "")
         if not 요청문:
-            return jsonify({"error": "입력 문장이 필요합니다"}), 400
+            return jsonify({"error": "입력 문장이 없습니다"}), 400
 
-        # ✅ 파서 적용
+        # ✅ 파싱
         name, number, phone, lineage = parse_registration(요청문)
-
         if not name:
-            return jsonify({"error": "이름 파싱 실패"}), 400
+            return jsonify({"error": "회원명을 추출할 수 없습니다"}), 400
 
         # ✅ 시트 접근
         sheet = get_member_sheet()
         headers = [h.strip() for h in sheet.row_values(1)]
         rows = sheet.get_all_records()
+
+        print(f"[DEBUG] 시트 헤더: {headers}")
 
         # ✅ 기존 회원 여부 확인
         for i, row in enumerate(rows):
@@ -526,11 +527,12 @@ def save_member():
                     "휴대폰번호": phone,
                     "계보도": lineage
                 }.items():
-                    if key in headers:
+                    if key in headers and value:
                         sheet.update_cell(i + 2, headers.index(key) + 1, value)
                 return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"}), 200
 
-        # ✅ 신규 회원 등록
+        # ✅ 신규 등록
+        print(f"[INFO] 신규 회원 '{name}' 등록")
         new_row = [''] * len(headers)
         for key, value in {
             "회원명": name,
@@ -538,7 +540,7 @@ def save_member():
             "휴대폰번호": phone,
             "계보도": lineage
         }.items():
-            if key in headers:
+            if key in headers and value:
                 new_row[headers.index(key)] = value
 
         sheet.insert_row(new_row, 2)
@@ -550,7 +552,8 @@ def save_member():
         return jsonify({"error": str(e)}), 500
 
 
-    
+
+    #### 변경했어
 
 
 
