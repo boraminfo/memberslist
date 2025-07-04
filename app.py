@@ -425,7 +425,12 @@ def parse_registration_command(command):
 @app.route("/register", methods=["POST"])
 def register_member():
     data = request.get_json()
-    command = data.get("command", "").strip()
+
+
+
+    name = data.get("회원명", "").strip()
+    number = data.get("회원번호", "").strip()
+
 
     # 파싱
     name, number = parse_registration_command(command)
