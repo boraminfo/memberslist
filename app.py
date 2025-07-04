@@ -398,11 +398,10 @@ def update_member():
 
 # ✅ 회원 등록 명령 파싱 함수
 # ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
-import re
-
 def parse_registration(text):
-    text = text.strip()
-    print(f"[🔍DEBUG] 입력 text: '{text}'")
+    text = text.replace("\n", " ").replace("\r", " ").strip()
+    print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
+
 
     name = number = phone = lineage = ""
 
@@ -435,7 +434,7 @@ def parse_registration(text):
                 print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
 
     # ✅ 계보도 추정
-    위치어 = ["좌측", "우측", "왼쪽", "오른쪽"]
+    위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
     불필요_계보도 = ["회원등록", "회원", "등록"]
     필터링된 = [
         w for w in korean_words
@@ -454,6 +453,15 @@ def parse_registration(text):
 
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
+
+
+
+
+
+
+
+
+
 
 
 
