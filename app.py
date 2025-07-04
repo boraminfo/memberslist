@@ -614,11 +614,7 @@ def save_member():
         print(f"[DEBUG] 🔍 등록 요청 여부 판단: 요청문='{요청문}', 회원명_입력값='{회원명_입력값}', 결과={등록요청여부}")
 
         if 등록요청여부:
-            if len(req_raw.keys()) == 1 and "회원명" in req_raw:
-                new_row = [''] * len(headers)
-                new_row[headers.index("회원명")] = name
-                sheet.insert_row(new_row, 2)
-                return jsonify({"message": f"{name} 회원 등록 완료 (기본 정보만 저장됨)"})
+
 
             new_row = [''] * len(headers)
             if "회원명" in headers:
