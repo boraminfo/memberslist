@@ -498,86 +498,57 @@ def parse_registration(text):
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
-        req_raw = request.get_json()
-        print(f"[DEBUG] 📥 Raw 요청 수신: {req_raw}")
+        req = request.get_json()
+        print(f"[DEBUG] 요청 데이터: {req}")
 
-        요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
-        회원명_입력값 = req_raw.get("회원명", "")
+        요청문 = req.get("요청문") or req.get("회원명", "")
+        if not 요청문:
+            return jsonify({"error": "입력 문장이 필요합니다"}), 400
 
-        # 요청문 생성 로직
-        if not 요청문 and 회원명_입력값 and any(x in 회원명_입력값 for x in ["회원등록", "신규회원 등록", "회원 추가"]):
-            요청문 = 회원명_입력값
-        elif not 요청문 and 회원명_입력값:
-            요청문 = f"회원등록 {회원명_입력값}"
-
-        if 회원명_입력값.startswith(("회원등록", "신규회원 등록", "회원 추가")):
-            parts = 회원명_입력값.split()
-            if len(parts) >= 2:
-                회원명_입력값 = ' '.join(parts[1:] + parts[:1])
-        if 요청문.startswith(("회원등록", "신규회원 등록", "회원 추가")):
-            parts = 요청문.split()
-            if len(parts) >= 2:
-                요청문 = ' '.join(parts[1:] + parts[:1])
-
-        # 파서 실행
-        name, number, 휴대폰번호, 계보도 = parse_registration(요청문 or 회원명_입력값)
-        if not name:
-            print(f"[ERROR] ❌ 이름 파싱 실패 — 요청문: '{요청문}', 회원명_입력값: '{회원명_입력값}'")
-            name = 회원명_입력값.strip()
-
-        등록문구_패턴 = r"(회원등록|신규회원 등록|회원 추가|회원)"
-        name = re.sub(등록문구_패턴, "", name).replace("  ", " ").strip()
-
-        if not number:
-            number = req_raw.get("회원번호", "").strip()
+        # ✅ 파서 적용
+        name, number, phone, lineage = parse_registration(요청문)
 
         if not name:
-            return jsonify({"error": "회원명은 필수입니다"}), 400
+            return jsonify({"error": "이름 파싱 실패"}), 400
 
-        print(f"[DEBUG] 📝 최종 등록 데이터: 이름={name}, 번호={number}, 휴대폰번호={휴대폰번호}, 계보도={계보도}")
-
+        # ✅ 시트 접근
         sheet = get_member_sheet()
-        data = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
-        print(f"[DEBUG] 📄 시트 헤더: {headers}")
+        rows = sheet.get_all_records()
 
-        # 기존 회원 존재 여부 확인
-        member_exists = any(str(row.get("회원명", "")).strip() == name for row in data)
+        # ✅ 기존 회원 여부 확인
+        for i, row in enumerate(rows):
+            if str(row.get("회원명", "")).strip() == name:
+                print(f"[INFO] 기존 회원 '{name}' 발견 → 수정")
+                for key, value in {
+                    "회원명": name,
+                    "회원번호": number,
+                    "휴대폰번호": phone,
+                    "계보도": lineage
+                }.items():
+                    if key in headers:
+                        sheet.update_cell(i + 2, headers.index(key) + 1, value)
+                return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"}), 200
 
-        if not member_exists:
-            print(f"[DEBUG] 🆕 시트에 '{name}' 없음 → 신규 등록 수행")
-            new_row = [''] * len(headers)
-            if "회원명" in headers:
-                new_row[headers.index("회원명")] = name
-            if "회원번호" in headers:
-                new_row[headers.index("회원번호")] = number
-            if "휴대폰번호" in headers:
-                new_row[headers.index("휴대폰번호")] = 휴대폰번호
-            if "계보도" in headers:
-                new_row[headers.index("계보도")] = 계보도
+        # ✅ 신규 회원 등록
+        new_row = [''] * len(headers)
+        for key, value in {
+            "회원명": name,
+            "회원번호": number,
+            "휴대폰번호": phone,
+            "계보도": lineage
+        }.items():
+            if key in headers:
+                new_row[headers.index(key)] = value
 
-            for key, value in req_raw.items():
-                if key in headers and key not in ["회원명", "회원번호"]:
-                    new_row[headers.index(key)] = value
-
-            print(f"[DEBUG] ➕ 신규 회원 행 추가: {new_row}")
-            sheet.insert_row(new_row, 2)
-            return jsonify({
-                "message": f"{name} 회원 신규 등록 완료" + (f" (회원번호 {number})" if number else "")
-            }), 200
-
-        else:
-            print(f"[INFO] ⚠️ '{name}'은 이미 등록되어 있어 등록 생략")
-            return jsonify({
-                "message": f"이미 등록된 회원 '{name}'입니다.",
-                "회원정보": {"회원명": name, "회원번호": number, "휴대폰번호": 휴대폰번호}
-            }), 200
+        sheet.insert_row(new_row, 2)
+        return jsonify({"message": f"{name} 회원 신규 등록 완료"}), 200
 
     except Exception as e:
         import traceback
-        print("[FATAL] ❗예외 발생:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
     
 
