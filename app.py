@@ -503,17 +503,20 @@ def parse_registration(text):
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
-        req = request.get_json()
-        print(f"[DEBUG] 📥 요청 수신: {req}")
+        data = request.get_json()
+        print(f"[DEBUG] 📥 요청 수신: {data}")
 
-        요청문 = req.get("요청문") or req.get("회원명", "")
-        if not 요청문:
-            return jsonify({"error": "입력 문장이 없습니다"}), 400
+        name = data.get("회원명", "").strip()
+        number = str(data.get("회원번호", "")).strip()
+        phone = data.get("휴대폰번호", "").strip()
+        lineage = data.get("계보도", "").strip()
 
-        # ✅ 파싱
-        name, number, phone, lineage = parse_registration(요청문)
         if not name:
-            return jsonify({"error": "회원명을 추출할 수 없습니다"}), 400
+            return jsonify({"error": "회원명은 필수입니다."}), 400
+
+
+
+
 
         # ✅ 시트 접근
         sheet = get_member_sheet()
@@ -551,18 +554,17 @@ def save_member():
         # ✅ 신규 등록
         print(f"[INFO] 신규 회원 '{name}' 등록")
         new_row = [''] * len(headers)
-        for key, value in {
+
+        field_map = {
             "회원명": name,
             "회원번호": number,
             "휴대폰번호": phone,
             "계보도": lineage
-        }.items():
+        }
 
-
-
-
-            if key in headers:
-                new_row[headers.index(key)] = value  # 빈 값도 삽입
+        for i, header in enumerate(headers):
+            if header in field_map:
+                new_row[i] = field_map[header]
 
 
 
