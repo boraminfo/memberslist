@@ -567,6 +567,13 @@ def save_member():
         요청문 = req_raw.get("요청문", "") if isinstance(req_raw, dict) else ""
         회원명_입력값 = req_raw.get("회원명", "")
 
+
+        # ✅ 이 줄을 여기에 추가!
+        if not 요청문 and 회원명_입력값:
+            요청문 = f"회원등록 {회원명_입력값}"
+
+
+
         if 회원명_입력값.startswith(("회원등록", "신규회원 등록", "회원 추가")):
             parts = 회원명_입력값.split()
             if len(parts) >= 2:
