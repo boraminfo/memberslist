@@ -188,6 +188,12 @@ field_map = {
 
 
 
+# 🔽 파일 하단에 삽입 예시
+def save_member(name):
+    print(f"[✅] '{name}' 회원 등록")
+
+def update_member_fields(name, fields):
+    print(f"[✏️] '{name}' 필드 업데이트: {fields}")
 
 
 
@@ -398,44 +404,48 @@ def update_member():
 
 # ✅ 회원 등록 명령 파싱 함수
 # ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
+
+
+# ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링 및 위치 포함 허용)
 def parse_registration(text):
-
+    # 전처리
     text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
-
 
     print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
     print(f"[DEBUG] ✅ 파싱 전 원본: '{text}'")
-    print(f"[DEBUG] 🈶 한글 단어들: {re.findall(r'[가-힣]{2,}', text)}")
-    phone_result = re.search(r"010[-\d]{7,}", text)
-    print(f"[DEBUG] 📱 휴대폰 추출 결과: {phone_result}")
-
 
     name = number = phone = lineage = ""
-
-    # ✅ 휴대폰번호 추출
-    phone_match = re.search(r"010[-\d]{7,}", text)
-    if phone_match:
-        phone = phone_match.group(0)
-        print(f"[DEBUG] 📱 휴대폰번호 추출: {phone}")
 
     # ✅ 한글 단어 추출
     korean_words = re.findall(r"[가-힣]{2,}", text)
     print(f"[DEBUG] 🈶 한글 단어들: {korean_words}")
 
-    # ✅ 이름 + 회원번호
+    # ✅ 휴대폰번호 추출 및 포맷
+    phone_match = re.search(r"010[-\d]{7,}", text)
+    if phone_match:
+        raw_phone = re.sub(r"\D", "", phone_match.group(0))
+        if len(raw_phone) == 11:
+            phone = f"{raw_phone[:3]}-{raw_phone[3:7]}-{raw_phone[7:]}"
+            print(f"[DEBUG] 📱 휴대폰번호 추출 및 포맷: {phone}")
+        else:
+            print(f"[⚠️] 📱 번호 길이 오류: {raw_phone}")
+
+    # ✅ 이름 + 회원번호 (포맷1: '김영희 회원번호 12345678')
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
     if match:
         name, number = match.group(1).strip(), match.group(2).strip()
         print(f"[✅DEBUG] 회원번호 형식 매칭 → name: '{name}', number: '{number}'")
+
     else:
-        # ✅ 이름 + 번호 + '회원등록'
-        match = re.search(r"(.+?)\s+(\d{6,})", text)
-        if match and "회원등록" in text:
+        # ✅ 포맷2: '회원등록 김영희 12345678'
+        match = re.search(r"회원등록\s+([가-힣]+)\s+(\d{6,})", text)
+        if match:
             name, number = match.group(1).strip(), match.group(2).strip()
             print(f"[✅DEBUG] 번호 포함 등록 형식 → name: '{name}', number: '{number}'")
+
         else:
-            # ✅ 이름만 + '회원등록'
-            match = re.search(r"^([\w가-힣\s]+?)\s*회원등록$", text)
+            # ✅ 포맷3: '회원등록 김영희'
+            match = re.search(r"회원등록\s+([가-힣]+)", text)
             if match:
                 name = match.group(1).strip()
                 print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
@@ -458,8 +468,9 @@ def parse_registration(text):
         name = korean_words[0]
         print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
 
-    print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
+    print(f"[✅RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
+
 
 
 
