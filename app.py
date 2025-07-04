@@ -421,43 +421,45 @@ def parse_registration_command(command):
         return match.group(1), match.group(2)
     return None, None
 
-@app.route("/auto_register", methods=["POST"])
-def auto_register():
+@app.route("/chat", methods=["POST"])
+def chat():
     data = request.get_json()
-    command = data.get("command", "").strip()
-    name, number = parse_registration_command(command)
+    message = data.get("message", "").strip()
 
-    if not name or not number:
-        return jsonify({"error": "형식 오류: '회원등록 이름 회원번호' 형식으로 입력해주세요."}), 400
+    # ✅ 명령어 감지
+    if message.startswith("회원등록"):
+        name, number = parse_registration_command(message)
+        if not name or not number:
+            return jsonify({"error": "형식 오류: '회원등록 이름 회원번호' 형식으로 입력해주세요."}), 400
 
-    try:
-        sheet = get_member_sheet()  # 이미 정의된 함수 사용
-        headers = [h.strip() for h in sheet.row_values(1)]
-        records = sheet.get_all_records()
+        try:
+            sheet = get_member_sheet()
+            headers = [h.strip() for h in sheet.row_values(1)]
+            records = sheet.get_all_records()
 
-        for row in records:
-            if str(row.get("회원명", "")).strip() == name:
-                return jsonify({
-                    "message": f"이미 등록된 회원 '{name}'입니다.",
-                    "회원정보": row
-                }), 200
+            for row in records:
+                if str(row.get("회원명", "")).strip() == name:
+                    return jsonify({
+                        "message": f"이미 등록된 회원 '{name}'입니다.",
+                        "회원정보": row
+                    }), 200
 
-        new_row = [''] * len(headers)
-        if "회원명" in headers:
-            new_row[headers.index("회원명")] = name
-        if "회원번호" in headers:
-            new_row[headers.index("회원번호")] = number
+            new_row = [''] * len(headers)
+            if "회원명" in headers:
+                new_row[headers.index("회원명")] = name
+            if "회원번호" in headers:
+                new_row[headers.index("회원번호")] = number
 
-        sheet.insert_row(new_row, 2)
-        return jsonify({
-            "message": f"{name} 회원 등록 완료 (회원번호: {number})"
-        }), 200
+            sheet.insert_row(new_row, 2)
+            return jsonify({
+                "message": f"{name} 회원 등록 완료 (회원번호: {number})"
+            }), 200
 
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
-
-    
+    # ✅ 기타 메시지 대응
+    return jsonify({"message": "처리할 수 없는 명령입니다."}), 400
 
 
 
