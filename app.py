@@ -287,14 +287,17 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
             value_raw = re.sub(r'\s+', ' ', value_raw)
 
+            field = field_map[keyword]
+
             # 후처리: 조사/명령어 제거
             value = re.sub(r"(으로|로|에)?(수정|변경|바꿔줘|바꿔|바꿈)?$", "", value_raw)
+
 
             # ✅ 숫자 필드일 경우 쉼표 등 제거
             if field in ["회원번호", "주민번호", "우편번호"]:
                 value = re.sub(r"[^\d]", "", value)
 
-            field = field_map[keyword]
+
 
             if field not in 수정된필드 and value not in 수정된필드.values():  # ✅ 중복 저장 방지
                 수정된필드[field] = value
