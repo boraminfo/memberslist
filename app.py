@@ -1444,17 +1444,10 @@ def parse_and_save_order():
 
 
 
-
-if __name__ == '__main__':
-    app.run(debug=True)
-
-
-
-
-
+# 서버 실행
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))  # Render가 지정한 포트 사용
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
+
 
 
 
