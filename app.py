@@ -400,9 +400,6 @@ def update_member():
 
 
 
-@app.route('/')
-def index():
-    return render_template('chat.html')  # 위 HTML을 chat.html로 저장
 
 
 # ==========================================================================================================
@@ -1435,7 +1432,6 @@ def parse_and_save_order():
 # 서버 실행
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
 
 
 
