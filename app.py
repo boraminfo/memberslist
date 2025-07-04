@@ -437,13 +437,22 @@ def parse_registration(text):
     # ✅ 이름 + 회원번호 추출
     match = re.search(r"(?:회원등록\s*)?([가-힣]{2,10})\s*회원번호\s*(\d+)", text)
     if match:
-        name, number = match.group(1).strip(), match.group(2).strip()
+        name = match.group(1).strip()
+        number = re.sub(r"[^\d]", "", match.group(2)).strip()
+
+
+
+
         print(f"[✅DEBUG] 회원번호 형식 매칭 → name: '{name}', number: '{number}'")
     else:
         # ✅ 이름 + 번호 + '회원등록' 포함 시 추출
         match = re.search(r"([가-힣]{2,10})\s+(\d{6,})", text)
         if match and "회원등록" in text:
-            name, number = match.group(1).strip(), match.group(2).strip()
+            name = match.group(1).strip()
+            number = re.sub(r"[^\d]", "", match.group(2)).strip()
+
+
+
             print(f"[✅DEBUG] 번호 포함 등록 형식 → name: '{name}', number: '{number}'")
         else:
             # ✅ 이름만 + '회원등록'
@@ -553,7 +562,7 @@ def save_member():
 
 
 
-    #### 변경했어
+    
 
 
 
