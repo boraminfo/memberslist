@@ -1431,6 +1431,7 @@ def parse_and_save_order():
 
 
 
+# ㅈ잘 돼야 해
 
 
 
@@ -1443,8 +1444,4 @@ def parse_and_save_order():
 # 서버 실행
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
-
-
-
-
 
