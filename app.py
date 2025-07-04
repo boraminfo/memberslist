@@ -402,7 +402,12 @@ def parse_registration(text):
 
     text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
 
+
     print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
+    print(f"[DEBUG] ✅ 파싱 전 원본: '{text}'")
+    print(f"[DEBUG] 🈶 한글 단어들: {re.findall(r'[가-힣]{2,}', text)}")
+    phone_result = re.search(r"010[-\d]{7,}", text)
+    print(f"[DEBUG] 📱 휴대폰 추출 결과: {phone_result}")
 
 
     name = number = phone = lineage = ""
@@ -1440,12 +1445,8 @@ def parse_and_save_order():
 
 
 
-# ㅈ잘 돼야 해
-
-
-# 돼야 해
-
-# 돼야 해
+if __name__ == '__main__':
+    app.run(debug=True)
 
 
 
