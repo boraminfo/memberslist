@@ -399,6 +399,62 @@ def update_member():
 
 
 
+# 변경사항이 있어
+
+
+
+# ==========================================================================================================
+
+
+@app.route('/chat_register', methods=['POST'])
+def chat_register():
+    try:
+        data = request.get_json()
+        text = data.get("요청문", "").strip()
+
+        if not text:
+            return jsonify({"error": "요청문이 비어 있습니다."}), 400
+
+        # ✅ 자연어 파싱
+        name, number, phone, lineage = parse_registration(text)
+        if not name:
+            return jsonify({"error": "회원명을 추출할 수 없습니다."}), 400
+
+        # ✅ 시트 접근
+        sheet = get_member_sheet()
+        headers = [h.strip() for h in sheet.row_values(1)]
+        rows = sheet.get_all_records()
+
+        # ✅ 기존 회원 검사
+        for row in rows:
+            if str(row.get("회원명", "")).strip() == name:
+                return jsonify({
+                    "message": f"이미 등록된 회원입니다: {name}",
+                    "회원명": name,
+                    "회원번호": row.get("회원번호", ""),
+                    "휴대폰번호": row.get("휴대폰번호", "")
+                }), 200
+
+        # ✅ 신규 등록
+        new_row = [''] * len(headers)
+        field_map = {
+            "회원명": name,
+            "회원번호": number,
+            "휴대폰번호": phone,
+            "계보도": lineage
+        }
+
+        for i, header in enumerate(headers):
+            if header in field_map:
+                new_row[i] = field_map[header]
+
+        sheet.insert_row(new_row, 2)
+        return jsonify({"message": f"{name} 회원 신규 등록 완료"}), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 # ==========================================================================================================
