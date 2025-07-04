@@ -421,28 +421,20 @@ def parse_registration_command(command):
         return match.group(1), match.group(2)
     return None, None
 
-# ✅ 회원 등록 API
-@app.route("/register", methods=["POST"])
-def register_member():
+@app.route("/auto_register", methods=["POST"])
+def auto_register():
     data = request.get_json()
-
-
-
-    name = data.get("회원명", "").strip()
-    number = data.get("회원번호", "").strip()
-
-
-    # 파싱
+    command = data.get("command", "").strip()
     name, number = parse_registration_command(command)
+
     if not name or not number:
         return jsonify({"error": "형식 오류: '회원등록 이름 회원번호' 형식으로 입력해주세요."}), 400
 
     try:
-        sheet = get_member_sheet()
+        sheet = get_member_sheet()  # 이미 정의된 함수 사용
         headers = [h.strip() for h in sheet.row_values(1)]
         records = sheet.get_all_records()
 
-        # ✅ 중복 확인
         for row in records:
             if str(row.get("회원명", "")).strip() == name:
                 return jsonify({
@@ -450,7 +442,6 @@ def register_member():
                     "회원정보": row
                 }), 200
 
-        # ✅ 등록 진행
         new_row = [''] * len(headers)
         if "회원명" in headers:
             new_row[headers.index("회원명")] = name
@@ -464,6 +455,8 @@ def register_member():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
     
 
 
