@@ -403,66 +403,69 @@ def update_member():
 
 
 # ✅ 회원 등록 명령 파싱 함수
+
+# ✅ 회원 등록 명령 파싱 함수
+# ✅ 통합 파싱 함수 (4유형 입력 + 휴대폰 + 계보도)
+
+# ✅ 통합 파싱 함수 (디버깅 포함)
+
+
 # ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
 def parse_registration(text):
-
-    text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
-
-    print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
-
+    text = text.strip()
+    print(f"[🔍DEBUG] 입력 text: '{text}'")
 
     name = number = phone = lineage = ""
 
-    # ✅ 휴대폰번호 추출
+    # ✅ 휴대폰번호 패턴
     phone_match = re.search(r"010[-\d]{7,}", text)
     if phone_match:
         phone = phone_match.group(0)
         print(f"[DEBUG] 📱 휴대폰번호 추출: {phone}")
 
-    # ✅ 한글 단어 추출
-    korean_words = re.findall(r"[가-힣]{2,}", text)
+    # ✅ 기본 한글 단어 추출 (붙은 단어 포함)
+    korean_words = re.findall(r"[가-힣]{2,10}", text)
     print(f"[DEBUG] 🈶 한글 단어들: {korean_words}")
 
-    # ✅ 이름 + 회원번호
+    # ✅ 형식 0: '회원명: 김철수 등록'
+    if "회원명" in text and "등록" in text:
+        match = re.search(r"회원명\s*[:：]?\s*([\w가-힣\s]+)", text)
+        if match:
+            name = match.group(1).strip()
+            print(f"[✅DEBUG] 형식0 매칭 → name: '{name}'")
+            return name, None, phone, ""
+
+    # ✅ 형식 1: '김철수 회원번호 12345678'
     match = re.search(r"(.+?)\s*회원번호\s*(\d+)", text)
     if match:
         name, number = match.group(1).strip(), match.group(2).strip()
-        print(f"[✅DEBUG] 회원번호 형식 매칭 → name: '{name}', number: '{number}'")
+        print(f"[✅DEBUG] 형식1 매칭 → name: '{name}', number: '{number}'")
     else:
-        # ✅ 이름 + 번호 + '회원등록'
+        # ✅ 형식 2: '김철수 12345678 등록'
         match = re.search(r"(.+?)\s+(\d{6,})", text)
-        if match and "회원등록" in text:
+        if match and "등록" in text:
             name, number = match.group(1).strip(), match.group(2).strip()
-            print(f"[✅DEBUG] 번호 포함 등록 형식 → name: '{name}', number: '{number}'")
+            print(f"[✅DEBUG] 형식2 매칭 → name: '{name}', number: '{number}'")
         else:
-            # ✅ 이름만 + '회원등록'
-            match = re.search(r"^([\w가-힣\s]+?)\s*회원등록$", text)
+            # ✅ 형식 3: '김철수 등록'
+            match = re.search(r"^([\w가-힣\s]+?)\s*등록$", text)
             if match:
                 name = match.group(1).strip()
-                print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
+                print(f"[✅DEBUG] 형식3 매칭 → name: '{name}'")
 
-    # ✅ 계보도 추정
-    위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
-    불필요_계보도 = ["회원등록", "회원", "등록"]
-    필터링된 = [
-        w for w in korean_words
-        if w not in 불필요_계보도 and w != name and w not in name
-    ]
+    # ✅ 계보도 추정 (불필요 키워드 제외)
+    불필요_계보도 = ["회원등록", "신규회원", "회원", "등록"]
+    계보도_후보 = [w for w in korean_words if w not in 불필요_계보도 and w != name]
+    if 계보도_후보:
+        lineage = 계보도_후보[-1]
 
-    if len(필터링된) >= 2 and 필터링된[-1] in 위치어:
-        lineage = f"{필터링된[-2]} {필터링된[-1]}"
-    elif 필터링된:
-        lineage = 필터링된[-1]
-
-    # ✅ fallback 이름
+    # ✅ fallback 로그
     if not name and korean_words:
         name = korean_words[0]
         print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
 
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
-
-
 
 
 
@@ -661,6 +664,8 @@ def save_member():
         print("[FATAL] ❗예외 발생:")
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+    
+    
 
 
 
