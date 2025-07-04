@@ -399,7 +399,9 @@ def update_member():
 # ✅ 회원 등록 명령 파싱 함수
 # ✅ 통합 파싱 함수 (디버깅 포함 + 계보도 필터링)
 def parse_registration(text):
-    text = text.replace("\n", " ").replace("\r", " ").strip()
+
+    text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
+
     print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
 
 
