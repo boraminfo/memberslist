@@ -243,9 +243,9 @@ def find_member():
 
 
 
+# ========================================================================================
 
 
-# ============================================================================================================================
 
 
 # ✅ 회원 수정
@@ -315,6 +315,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 member[f"{field}_기록"] = f"(기록됨: {value})"
 
     return member, 수정된필드
+
+
 
 
 
@@ -400,62 +402,6 @@ def update_member():
 
 
 
-
-
-# ==========================================================================================================
-
-
-@app.route('/chat_register', methods=['POST'])
-def chat_register():
-    try:
-        data = request.get_json()
-        text = data.get("요청문", "").strip()
-
-        if not text:
-            return jsonify({"error": "요청문이 비어 있습니다."}), 400
-
-        # ✅ 자연어 파싱
-        name, number, phone, lineage = parse_registration(text)
-        if not name:
-            return jsonify({"error": "회원명을 추출할 수 없습니다."}), 400
-
-        # ✅ 시트 접근
-        sheet = get_member_sheet()
-        headers = [h.strip() for h in sheet.row_values(1)]
-        rows = sheet.get_all_records()
-
-        # ✅ 기존 회원 검사
-        for row in rows:
-            if str(row.get("회원명", "")).strip() == name:
-                return jsonify({
-                    "message": f"이미 등록된 회원입니다: {name}",
-                    "회원명": name,
-                    "회원번호": row.get("회원번호", ""),
-                    "휴대폰번호": row.get("휴대폰번호", "")
-                }), 200
-
-        # ✅ 신규 등록
-        new_row = [''] * len(headers)
-        field_map = {
-            "회원명": name,
-            "회원번호": number,
-            "휴대폰번호": phone,
-            "계보도": lineage
-        }
-
-        for i, header in enumerate(headers):
-            if header in field_map:
-                new_row[i] = field_map[header]
-
-        sheet.insert_row(new_row, 2)
-        return jsonify({"message": f"{name} 회원 신규 등록 완료"}), 200
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-
 # ==========================================================================================================
 
 
@@ -507,30 +453,20 @@ def parse_registration(text):
                 name = match.group(1).strip()
                 print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
 
-
-
-
-
     # ✅ fallback 이름
     if not name and korean_words:
         name = korean_words[0]
         print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
 
-
-
     # ✅ fallback 회원번호
-    # if not number:
-    #     number = str(uuid.uuid4())[:8]
-    #     print(f"[ℹ️DEBUG] fallback 회원번호 생성: {number}")
-
-
+    if not number:
+        number = str(uuid.uuid4())[:8]
+        print(f"[ℹ️DEBUG] fallback 회원번호 생성: {number}")
 
     # ✅ 계보도 추정
     위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
     불필요_계보도 = ["회원등록", "회원", "등록"]
     필터링된 = [w for w in korean_words if w not in 불필요_계보도]
-
-
 
     if name:
         필터링된 = [w for w in 필터링된 if w not in name]
@@ -540,38 +476,31 @@ def parse_registration(text):
     elif 필터링된:
         lineage = 필터링된[-1]
 
-
-
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
-    return name or "", number or "", phone or "", lineage or ""
-
- 
+    return name or None, number or None, phone or None, lineage or None
 
 
 
 
 
 
-# ====================================================================================================
-  
+
+
 # ✅ JSON 기반 회원 저장/수정 API
 @app.route('/save_member', methods=['POST'])
 def save_member():
     try:
-        data = request.get_json()
-        print(f"[DEBUG] 📥 요청 수신: {data}")
+        req = request.get_json()
+        print(f"[DEBUG] 📥 요청 수신: {req}")
 
-        name = data.get("회원명", "").strip()
-        number = str(data.get("회원번호", "")).strip()
-        phone = data.get("휴대폰번호", "").strip()
-        lineage = data.get("계보도", "").strip()
+        요청문 = req.get("요청문") or req.get("회원명", "")
+        if not 요청문:
+            return jsonify({"error": "입력 문장이 없습니다"}), 400
 
+        # ✅ 파싱
+        name, number, phone, lineage = parse_registration(요청문)
         if not name:
-            return jsonify({"error": "회원명은 필수입니다."}), 400
-
-
-
-
+            return jsonify({"error": "회원명을 추출할 수 없습니다"}), 400
 
         # ✅ 시트 접근
         sheet = get_member_sheet()
@@ -580,48 +509,31 @@ def save_member():
 
         print(f"[DEBUG] 시트 헤더: {headers}")
 
-
-
-
-
-
         # ✅ 기존 회원 여부 확인
         for i, row in enumerate(rows):
             if str(row.get("회원명", "")).strip() == name:
-                print(f"[INFO] 기존 회원 '{name}' 발견 → 등록 중단")
-                existing_number = row.get("회원번호", "")
-                existing_phone = row.get("휴대폰번호", "")
-
-                return jsonify({
-                    "message": f"이미 등록된 회원입니다: {name}",
+                print(f"[INFO] 기존 회원 '{name}' 발견 → 수정")
+                for key, value in {
                     "회원명": name,
-                    "회원번호": existing_number,
-                    "휴대폰번호": existing_phone
-                }), 200
-
-
-
-
-
-
-
+                    "회원번호": number,
+                    "휴대폰번호": phone,
+                    "계보도": lineage
+                }.items():
+                    if key in headers and value:
+                        sheet.update_cell(i + 2, headers.index(key) + 1, value)
+                return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"}), 200
 
         # ✅ 신규 등록
         print(f"[INFO] 신규 회원 '{name}' 등록")
         new_row = [''] * len(headers)
-
-        field_map = {
+        for key, value in {
             "회원명": name,
             "회원번호": number,
             "휴대폰번호": phone,
             "계보도": lineage
-        }
-
-        for i, header in enumerate(headers):
-            if header in field_map:
-                new_row[i] = field_map[header]
-
-
+        }.items():
+            if key in headers and value:
+                new_row[headers.index(key)] = value
 
         sheet.insert_row(new_row, 2)
         return jsonify({"message": f"{name} 회원 신규 등록 완료"}), 200
@@ -631,9 +543,7 @@ def save_member():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
-
-
-    
+ 
 
 
 
@@ -1432,6 +1342,7 @@ def parse_and_save_order():
 # 서버 실행
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
 
 
 
