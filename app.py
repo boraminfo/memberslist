@@ -290,7 +290,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             field = field_map[keyword]
 
             # 후처리: 조사/명령어 제거
-            value = re.sub(r"(으로|로|에)?(수정|변경|바꿔줘|바꿔|바꿈)?$", "", value_raw)
+            value = re.sub(r"(으로|로|에)?(수정|변경|로 수정해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw)
 
 
             # ✅ 숫자 필드일 경우 쉼표 등 제거
