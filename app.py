@@ -463,10 +463,22 @@ def parse_registration(text):
         number = str(uuid.uuid4())[:8]
         print(f"[ℹ️DEBUG] fallback 회원번호 생성: {number}")
 
-    # ✅ 계보도 추정
-    위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
-    불필요_계보도 = ["회원등록", "회원", "등록"]
-    필터링된 = [w for w in korean_words if w not in 불필요_계보도]
+
+
+
+
+    # ✅ 계보도 추정 - 정규식 기반 우선 추출
+    lineage_match = re.search(r"계보도.*?'(.+?)'", text)
+    if lineage_match:
+        lineage = lineage_match.group(1).strip()
+        print(f"[🎯DEBUG] 정규식으로 계보도 추출됨: {lineage}")
+    else:
+
+        # ✅ 계보도 추정
+        위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
+        불필요_계보도 = ["회원등록", "회원", "등록"]
+        필터링된 = [w for w in korean_words if w not in 불필요_계보도]
+        
 
     if name:
         필터링된 = [w for w in 필터링된 if w not in name]
