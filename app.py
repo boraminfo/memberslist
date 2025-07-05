@@ -243,6 +243,81 @@ def find_member():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ======================================================================================
+
+
+@app.route("/update_member", methods=["POST"])
+def update_member():
+    try:
+        raw_data = request.data.decode("utf-8")
+        data = json.loads(raw_data)
+        요청문 = data.get("요청문", "").strip()
+
+        if not 요청문:
+            return jsonify({"error": "요청문이 비어 있습니다."}), 400
+
+        sheet = get_member_sheet()
+        db = sheet.get_all_records()
+        headers = [h.strip().lower() for h in sheet.row_values(1)]
+        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명") is not None]
+
+        # 회원명 찾기
+        name = None
+        for candidate in sorted(member_names, key=lambda x: -len(x)):
+            if candidate and candidate in 요청문:
+                name = candidate
+                break
+
+        if not name:
+            return jsonify({"error": "요청문에서 유효한 회원명을 찾을 수 없습니다."}), 400
+
+        matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == name]
+        if not matching_rows:
+            return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
+
+
+        row_index = matching_rows[0] + 2
+        member = db[matching_rows[0]]
+
+        # 수정
+        updated_member, 수정된필드 = parse_request_and_update(요청문, member)
+
+        수정결과 = []
+        for key, value in updated_member.items():
+            if key.endswith("_기록"):
+                continue
+            if key.strip().lower() in headers:
+                col = headers.index(key.strip().lower()) + 1
+                sheet.update_cell(row_index, col, value)
+                수정결과.append({"필드": key, "값": value})
+
+
+        return jsonify({"status": "success", "회원명": name, "수정": 수정결과}), 200
+
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
 # ========================================================================================
 
 
@@ -250,82 +325,6 @@ def find_member():
 
 # ✅ 회원 수정
 # ✅ 자연어 요청문에서 필드와 값 추출, 회원 dict 수정
-# 필드 맵 (추가 가능)
-field_map = {
-    "휴대폰번호": "휴대폰번호",
-    "핸드폰": "휴대폰번호",
-    "회원번호": "회원번호",
-    "주소": "주소",
-    "이메일": "이메일",
-    "이름": "회원명",
-    "생일": "생년월일",
-    "생년월일": "생년월일",
-    "비밀번호": "비밀번호",
-    "직업": "근무처",
-    "직장": "근무처",
-}
-
-
-
-
-def parse_request_and_update(data: str, member: dict) -> tuple:
-    수정된필드 = {}
-
-# 정렬: 긴 키워드 우선
-    for keyword in sorted(field_map.keys(), key=lambda k: -len(k)):
-        # 다음 키워드 목록 준비
-        keywords_pattern = '|'.join(sorted(field_map.keys(), key=lambda k: -len(k)))
-        # 핵심 정규식: 현재 keyword → 다음 keyword 또는 문장 끝 전까지 추출
-        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=\s+(?:{keywords_pattern})(?:를|은|는|이|:|：)?|\s*$)"
-        matches = re.finditer(pattern, data)
-
-
-        matches = re.finditer(pattern, data)
-
-        for match in matches:
-            value_raw = match.group("value").strip()
-
-            value_raw = re.sub(r'\s+', ' ', value_raw)
-
-            field = field_map[keyword]
-
-            # 후처리: 조사/명령어 제거
-            value = re.sub(r"(으로|로|에)?(수정|변경|로 수정해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw)
-
-
-            # ✅ 숫자 필드일 경우 쉼표 등 제거
-            if field in ["회원번호", "주민번호", "우편번호"]:
-                value = re.sub(r"[^\d]", "", value)
-
-
-
-
-            # ✅ 추가: 휴대폰번호 정제
-            if field == "휴대폰번호":
-                phone_match = re.search(r"010[-]?\d{4}[-]?\d{4}", value)
-                value = phone_match.group(0) if phone_match else ""    
-
-
-
-
-
-            if field not in 수정된필드 and value not in 수정된필드.values():  # ✅ 중복 저장 방지
-                수정된필드[field] = value
-                member[field] = value
-                member[f"{field}_기록"] = f"(기록됨: {value})"
-
-    return member, 수정된필드
-
-
-
-
-
-
-
-
-
-
-
 
 
 # ✅ 회원 수정 API
