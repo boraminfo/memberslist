@@ -323,79 +323,84 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
+
+
+
+
+
 # ✅ 회원 수정 API
-@app.route("/update_member", methods=["POST"])
-def update_member():
-    try:
-        raw_data = request.data.decode("utf-8")
-        data = json.loads(raw_data)
-        요청문 = data.get("요청문", "").strip()
+def parse_request_and_update(data: str, member: dict) -> tuple:
+    수정된필드 = {}
 
-        if not 요청문:
-            return jsonify({"error": "요청문이 비어 있습니다."}), 400
+    # 허용된 필드만 제한
+    field_map = {
+        "회원명": "회원명",
+        "휴대폰번호": "휴대폰번호",
+        "회원번호": "회원번호",
+        "계보도": "계보도"
+    }
 
-        # ✅ 시트 가져오기 및 회원명 리스트 확보
-        sheet = get_member_sheet()
-        db = sheet.get_all_records()
-        raw_headers = sheet.row_values(1)
-        headers = [h.strip().lower() for h in raw_headers]
+    # 요청문에 명시된 키워드가 있는지 확인
+    used_keywords = [k for k in field_map if k in data]
 
-        # ✅ 안전하게 문자열로 변환 후 strip()
-        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명") is not None]
+    # 키워드 기반 추출 우선
+    if used_keywords:
+        keywords_pattern = '|'.join(used_keywords)
 
+        for keyword in used_keywords:
+            field = field_map[keyword]
+            pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>.+?)(?=\s+(?:{keywords_pattern})(?:를|은|는|이|:|：)?|\s*$)"
+            matches = re.finditer(pattern, data)
 
-        # ✅ 요청문 내 포함된 실제 회원명 찾기 (길이순 정렬)
-        name = None
-        for candidate in sorted(member_names, key=lambda x: -len(x)):
-            if candidate and candidate in 요청문:
-                name = candidate
-                break
+            for match in matches:
+                value_raw = match.group("value").strip()
+                value_raw = re.sub(r'\s+', ' ', value_raw)
+                value = re.sub(r"(으로|로|에)?(수정|변경|로 수정해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw)
 
-        if not name:
-            return jsonify({"error": "요청문에서 유효한 회원명을 찾을 수 없습니다."}), 400
+                if field == "회원번호":
+                    value = re.sub(r"[^\d]", "", value)
+                elif field == "휴대폰번호":
+                    phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
+                    value = phone_match.group(0) if phone_match else ""
 
-        # ✅ 해당 회원 찾기
-        matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == name]
-        if len(matching_rows) == 0:
-            return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
-        if len(matching_rows) > 1:
-            return jsonify({"error": f"'{name}' 회원이 중복됩니다. 고유한 이름만 지원합니다."}), 400
+                if field not in 수정된필드 and value not in 수정된필드.values():
+                    수정된필드[field] = value
+                    member[field] = value
+                    member[f"{field}_기록"] = f"(기록됨: {value})"
 
-        row_index = matching_rows[0] + 2  # 헤더 포함으로 +2
-        member = db[matching_rows[0]]
+    else:
+        # 키워드가 없을 경우 추론
+        tokens = data.strip().split()
+        if len(tokens) >= 2:
+            name_candidate = tokens[0]
+            value_candidate = ' '.join(tokens[1:]).replace("수정", "").strip()
 
-        # ✅ 자연어 해석 및 필드 수정
-        updated_member, 수정된필드 = parse_request_and_update(요청문, member)
+            inferred_field = infer_field_from_value(value_candidate)
+            if inferred_field:
+                value = value_candidate
+                if inferred_field == "회원번호":
+                    value = re.sub(r"[^\d]", "", value)
+                elif inferred_field == "휴대폰번호":
+                    phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
+                    value = phone_match.group(0) if phone_match else ""
 
-        수정결과 = []
-        무시된필드 = []
+                수정된필드[inferred_field] = value
+                member[inferred_field] = value
+                member[f"{inferred_field}_기록"] = f"(기록됨: {value})"
 
-        for key, value in updated_member.items():
-            key_strip = key.strip()
-            key_lower = key_strip.lower()
+    return member, 수정된필드
 
-            # _기록 필드는 저장 안 함
-            if key_strip.endswith("_기록"):
-                continue
+def infer_field_from_value(value: str) -> str | None:
+    value = value.strip()
 
-            if key_lower in headers:
-                col_index = headers.index(key_lower) + 1
-                sheet.update_cell(row_index, col_index, value)
-                수정결과.append({"필드": key_strip, "값": value})
-            else:
-                무시된필드.append(key_strip)
+    if re.match(r"010[-]?\d{3,4}[-]?\d{4}", value):
+        return "휴대폰번호"
+    elif re.fullmatch(r"\d{4,10}", value):
+        return "회원번호"
+    elif re.search(r"(좌측|우측|중앙|왼쪽|오른쪽)", value):
+        return "계보도"
+    return None
 
-        return jsonify({
-            "status": "success",
-            "회원명": name,
-            "수정": 수정결과,
-            "무시된_필드": 무시된필드
-        }), 200
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 
 
@@ -478,7 +483,7 @@ def parse_registration(text):
         위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
         불필요_계보도 = ["회원등록", "회원", "등록"]
         필터링된 = [w for w in korean_words if w not in 불필요_계보도]
-        
+
 
     if name:
         필터링된 = [w for w in 필터링된 if w not in name]
