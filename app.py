@@ -356,7 +356,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         "회원명": "회원명",
         "휴대폰번호": "휴대폰번호",
         "회원번호": "회원번호",
-        "계보도": "계보도"
+        "계보도": "계보도",
+        "비밀번호": "비밀번호" 
     }
 
     # 요청문에 명시된 키워드가 있는지 확인
@@ -385,7 +386,9 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 if field not in 수정된필드 and value not in 수정된필드.values():
                     수정된필드[field] = value
                     member[field] = value
-                    member[f"{field}_기록"] = f"(기록됨: {value})"
+                    if field != "비밀번호":  # ✅ 비밀번호는 기록하지 않음
+                        member[f"{field}_기록"] = f"(기록됨: {value})"
+
 
     else:
         # 키워드가 없을 경우 추론
