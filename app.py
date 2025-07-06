@@ -356,8 +356,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         "회원명": "회원명",
         "휴대폰번호": "휴대폰번호",
         "회원번호": "회원번호",
-        "계보도": "계보도",
-        "비밀번호": "비밀번호" 
+        "계보도": "계보도"
     }
 
     # 요청문에 명시된 키워드가 있는지 확인
@@ -375,13 +374,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             for match in matches:
                 value_raw = match.group("value").strip()
                 value_raw = re.sub(r'\s+', ' ', value_raw)
-
-
-               
-                # 더 강력한 후처리: "으로", "다시", "수정", "해줘" 등 제거
-                value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|바꿔줘|바꿔|바꿈|해줘)?$", "", value_raw).strip()
-
-
+                # 더 강력한 후처리: 계보도 등에서 꼬리 명령어 제거
+                value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw).strip()
 
                 if field == "회원번호":
                     value = re.sub(r"[^\d]", "", value)
@@ -389,16 +383,10 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                     phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
                     value = phone_match.group(0) if phone_match else ""
 
-
-
-
-
                 if field not in 수정된필드 and value not in 수정된필드.values():
                     수정된필드[field] = value
                     member[field] = value
-                    if field != "비밀번호":  # ✅ 비밀번호는 기록하지 않음
-                        member[f"{field}_기록"] = f"(기록됨: {value})"
-
+                    member[f"{field}_기록"] = f"(기록됨: {value})"
 
     else:
         # 키워드가 없을 경우 추론
