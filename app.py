@@ -25,7 +25,7 @@ def some_function():
     time.sleep(1)
     print("작업 완료")
 
-    
+
 
 # ✅ 환경 변수 로드
 
@@ -384,6 +384,19 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                     phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
                     value = phone_match.group(0) if phone_match else ""
 
+                elif field == "비밀번호":
+                    value = value.strip().rstrip(",")  # <-- ✅ 쉼표 제거
+
+                elif field == "계보도":
+                    # ✅ '강소희우측' → '강소희 우측' 형태로 정리
+                    lineage_match = re.match(r"([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", value)
+                    if lineage_match:
+                        value = f"{lineage_match.group(1)} {lineage_match.group(2)}"
+                    else:
+                        # fallback: 중복 공백 제거
+                        value = re.sub(r"\s+", " ", value)
+
+
                 if field not in 수정된필드 and value not in 수정된필드.values():
                     수정된필드[field] = value
                     member[field] = value
@@ -420,6 +433,10 @@ def infer_field_from_value(value: str) -> str | None:
         return "회원번호"
     elif re.search(r"(좌측|우측|중앙|왼쪽|오른쪽)", value):
         return "계보도"
+
+    elif re.fullmatch(r"[a-zA-Z0-9@!#%^&*]{6,20}", value):
+        return "비밀번호"  # ✅ 비밀번호 후보로 인식
+    
     return None
 
 
