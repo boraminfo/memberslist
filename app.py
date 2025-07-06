@@ -375,13 +375,23 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             for match in matches:
                 value_raw = match.group("value").strip()
                 value_raw = re.sub(r'\s+', ' ', value_raw)
-                value = re.sub(r"(으로|로|에)?(수정|변경|로 수정해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw)
+
+
+               
+                # 더 강력한 후처리: "으로", "다시", "수정", "해줘" 등 제거
+                value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|바꿔줘|바꿔|바꿈|해줘)?$", "", value_raw).strip()
+
+
 
                 if field == "회원번호":
                     value = re.sub(r"[^\d]", "", value)
                 elif field == "휴대폰번호":
                     phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
                     value = phone_match.group(0) if phone_match else ""
+
+
+
+
 
                 if field not in 수정된필드 and value not in 수정된필드.values():
                     수정된필드[field] = value
