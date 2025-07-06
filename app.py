@@ -982,14 +982,15 @@ def add_counseling():
         text = text.replace("개인 메모", "개인메모")
         text = text.replace("상담 일지", "상담일지")
         text = text.replace("활동 일지", "활동일지")
+        text = text.replace("이미지 메모", "이미지메모")
 
-        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
+        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력", "이미지메모"]
         action_keywords = ["저장", "기록", "입력"]
 
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
-            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
+            return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력', '이미지메모'중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
-        match = re.search(r'([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력)', text)
+        match = re.search(r'([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력|이미지메모)', text)
         if not match:
             return jsonify({"message": "회원명을 인식할 수 없습니다."})
         member_name = match.group(1)
@@ -1004,7 +1005,7 @@ def add_counseling():
         text = re.sub(r'^[:：]\s*', '', text)
 
 
-        if matched_sheet not in ["상담일지", "개인메모", "활동일지"]:
+        if matched_sheet not in ["상담일지", "개인메모", "활동일지", "이미지메모"]:
             return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
 
         if save_to_sheet(matched_sheet, member_name, text):
