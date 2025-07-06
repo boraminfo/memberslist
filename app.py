@@ -223,17 +223,35 @@ def find_member():
         db = sheet.get_all_values()
         headers, rows = db[0], db[1:]
 
+        matched = []
         for row in rows:
             row_dict = dict(zip(headers, row))
             if name and row_dict.get("회원명") == name:
-                return jsonify(row_dict), 200
-            if number and row_dict.get("회원번호") == number:
-                return jsonify(row_dict), 200
+                matched.append(row_dict)
+            elif number and row_dict.get("회원번호") == number:
+                matched.append(row_dict)
 
-        return jsonify({"error": "해당 회원 정보를 찾을 수 없습니다."}), 404
+        if not matched:
+            return jsonify({"error": "해당 회원 정보를 찾을 수 없습니다."}), 404
+
+        if len(matched) == 1:
+            return jsonify(matched[0]), 200
+
+        result = []
+        for idx, member in enumerate(matched, start=1):
+            result.append({
+                "번호": idx,
+                "회원명": member.get("회원명"),
+                "회원번호": member.get("회원번호"),
+                "휴대폰번호": member.get("휴대폰번호")
+            })
+        return jsonify(result), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
 
 
 
