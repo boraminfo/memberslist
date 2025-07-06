@@ -2,23 +2,31 @@ import os
 import json
 import re
 import pandas as pd
-import gspread
 import pytz
 import uuid
 import openai
-from flask import Flask, request, jsonify
-from google.oauth2.service_account import Credentials
-from dotenv import load_dotenv
-from gspread.utils import rowcol_to_a1
-from datetime import datetime
-from collections import Counter
-from oauth2client.service_account import ServiceAccountCredentials
-
-from utils.sheets import get_order_sheet, get_member_info
-
 import requests
 import time
+from datetime import datetime
+from collections import Counter
+from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+import gspread
+from gspread.utils import rowcol_to_a1
+from google.oauth2.service_account import Credentials
+
+
+# ✅ 신버전 인증 방식 (권장)
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload
+
+# ✅ 사용자 정의 유틸 함수
 from utils.sheets import get_order_sheet, get_member_info
+
+
+
+
+
 
 def some_function():
     print("작업 시작")
@@ -26,10 +34,10 @@ def some_function():
     print("작업 완료")
 
 
+# ✅ 환경 변수 로드 및 GPT API 키 설정
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # ✅ 환경 변수 로드
-
-
 if os.getenv("RENDER") is None:  # 로컬에서 실행 중일 때만
     from dotenv import load_dotenv
     dotenv_path = os.path.abspath('.env')
@@ -51,13 +59,78 @@ def now_kst():
 print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
 
-
 app = Flask(__name__)
 
 if not os.getenv("GOOGLE_SHEET_KEY"):
     raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
 if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
     raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+
+
+
+
+
+
+
+
+
+# ✅ 인증 범위 설정 (스프레드시트 + 드라이브)
+SCOPES = [
+    'https://www.googleapis.com/auth/spreadsheets',
+    'https://www.googleapis.com/auth/drive'
+]
+
+# ✅ 서비스 계정 경로
+SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE", "credentials.json")
+
+# ✅ 인증 객체 생성
+credentials = Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+
+# ✅ 인증 실패 시 예외 처리
+if not credentials:
+    raise ValueError("Google 인증 실패: credentials.json 또는 환경 설정 확인")
+
+
+# ✅ gspread 클라이언트 인증
+gc = gspread.authorize(credentials)
+
+
+
+drive_service = build('drive', 'v3', credentials=credentials)
+
+
+# ✅ Google Sheets 연동 함수
+def get_worksheet(sheet_name):
+    try:
+        sheet = gc.open(GOOGLE_SHEET_TITLE)  # ✅ gc는 gspread 인증된 객체
+        return sheet.worksheet(sheet_name)
+    except Exception as e:
+        print(f"[시트 접근 오류] {e}")
+        return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # 자연어 명령 키워드 매핑
@@ -140,40 +213,14 @@ def get_search_memo_by_tags_sheet():
 def get_dailyrecord_sheet():
     return get_worksheet("활동일지")
 
-def get_product_order_sheet():
-    return get_worksheet("제품주문")    
-
 def get_image_sheet():
-    return get_worksheet("사진저장")
+    return get_worksheet("이미지메모")
 
 def get_backup_sheet():
     return get_worksheet("백업")
 
 
-# ✅ 환경 변수 로드 및 GPT API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY")
 
-# ✅ Google Sheets 인증
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
-
-
-
-
-
-
-
-
-
-# ✅ Google Sheets 연동 함수
-def get_worksheet(sheet_name):
-    try:
-        sheet = client.open(GOOGLE_SHEET_TITLE)
-        return sheet.worksheet(sheet_name)
-    except Exception as e:
-        print(f"[시트 접근 오류] {e}")
-        return None
 
 
 
@@ -1507,6 +1554,177 @@ def parse_and_save_order():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 시트 접근 함수
+def get_image_sheet():
+    return gc.open(SPREADSHEET_NAME).worksheet(IMAGE_MEMO_SHEET)
+
+
+
+# ✅ Google Drive 업로드 함수
+def upload_to_drive(file_path, filename):
+    service = build('drive', 'v3', credentials=credentials)
+    file_metadata = {'name': filename, 'parents': [DRIVE_FOLDER_ID]}
+    media = MediaFileUpload(file_path, resumable=True)
+    uploaded = service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+
+    file_id = uploaded.get('id')
+
+    # 공유 권한 부여 (공개 링크 보기 가능)
+    service.permissions().create(fileId=file_id, body={'role': 'reader', 'type': 'anyone'}).execute()
+
+    # ✅ 공유 링크 생성
+    return f'https://drive.google.com/uc?id={file_id}'
+
+
+
+
+
+
+
+# ✅ 이미지 업로드 및 시트 저장 API
+@app.route('/upload_image_memo', methods=['POST'])
+def upload_image_memo():
+    if 'image' not in request.files:
+        return jsonify({'error': '이미지 파일이 없습니다.'}), 400
+
+    image = request.files['image']
+    회원명 = request.form.get('회원명')
+    내용 = request.form.get('내용')
+
+    if not 회원명 or not 내용:
+        return jsonify({'error': '회원명과 내용은 필수입니다.'}), 400
+
+    # 임시 파일 저장
+    temp_path = f"temp_{image.filename}"
+    image.save(temp_path)
+
+    try:
+        # Google Drive 업로드 및 공유링크 생성
+        image_url = upload_to_drive(temp_path, image.filename)
+
+        # Google Sheets에 기록
+        sheet = get_image_sheet()
+        now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        sheet.append_row([now, 회원명, 내용, image_url])
+
+        return jsonify({'message': '저장 완료', '이미지링크': image_url})
+
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 키워드 기반 검색 API
+@app.route('/search_drive_files', methods=['GET'])
+def search_drive_files():
+    keyword = request.args.get('query', '')
+    mime_type = request.args.get('mimeType', '')
+    before = request.args.get('before', '')
+
+    q_parts = [f"'{DRIVE_FOLDER_ID}' in parents", "trashed = false"]
+
+    if keyword:
+        q_parts.append(f"name contains '{keyword}'")
+    if mime_type:
+        q_parts.append(f"mimeType = '{mime_type}'")
+    if before:
+        try:
+            dt = datetime.strptime(before, "%Y-%m-%d")
+            iso_date = dt.isoformat() + "Z"
+            q_parts.append(f"createdTime < '{iso_date}'")
+        except ValueError:
+            return jsonify({"error": "before 날짜 형식은 YYYY-MM-DD 형식이어야 합니다."}), 400
+
+    query = " and ".join(q_parts)
+
+    try:
+        results = drive_service.files().list(
+            q=query,
+            fields="files(id, name, mimeType, createdTime)",
+            orderBy="createdTime desc"
+        ).execute()
+
+        files = results.get('files', [])
+        file_list = [
+            {
+                'name': f['name'],
+                'id': f['id'],
+                'mimeType': f['mimeType'],
+                'createdTime': f['createdTime'],
+                'link': f"https://drive.google.com/uc?id={f['id']}"
+            }
+            for f in files
+        ]
+
+        return jsonify({'files': file_list})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
