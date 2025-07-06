@@ -281,7 +281,6 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
 
 
 
-
 def clean_value_expression(text: str) -> str:
     particles = ['로', '으로', '은', '는', '을', '를']
     for p in particles:
@@ -354,6 +353,14 @@ def update_member():
         # 수정
         updated_member, 수정된필드 = parse_request_and_update(요청문, member)
 
+
+
+
+
+
+
+
+
         수정결과 = []
         for key, value in updated_member.items():
             if key.endswith("_기록"):
@@ -407,8 +414,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         수정된필드["계보도"] = value
 
 
-
-
+    계보도_이름 = 계보도_패턴.group(1) if 계보도_패턴 else None
 
 
 
@@ -432,14 +438,41 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
-                if field == "회원번호":
-                    value = re.sub(r"[^\d]", "", value)
+
+                if field == "회원명":
+                    # 계보도 이름이 회원명으로 잘못 인식되는 것 방지
+                    if 계보도_이름 and 계보도_이름 in value:
+                        continue
+
+
+
+
+                elif field == "회원번호":
+                        match = re.search(r"\b회원번호\s*[:\-]?\s*(\d{4,8})\b", data)
+
+
+                        if match:
+                            value = match.group(1)
+                        else:
+                            continue  # 명시적으로 건너뜀
+
+
+
                 elif field == "휴대폰번호":
-                    phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
-                    value = phone_match.group(0) if phone_match else ""
+                    match = re.search(r"\b010[-]?\d{3,4}[-]?\d{4}\b", data)
+                    value = match.group(0) if match else ""
+
+
+
 
                 elif field == "비밀번호":
                     value = value.strip().rstrip(",")  # <-- ✅ 쉼표 제거
+
+
+
+
+
+
 
                 elif field == "계보도":
                     # ✅ '강소희우측' → '강소희 우측' 형태로 정리
@@ -483,7 +516,7 @@ def infer_field_from_value(value: str) -> str | None:
 
     if re.match(r"010[-]?\d{3,4}[-]?\d{4}", value):
         return "휴대폰번호"
-    elif re.fullmatch(r"\d{4,10}", value):
+    elif re.fullmatch(r"\d{4,8}", value):
         return "회원번호"
     elif re.search(r"(좌측|우측|중앙|왼쪽|오른쪽)", value):
         return "계보도"
