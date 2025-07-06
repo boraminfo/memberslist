@@ -503,6 +503,9 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
                 if field not in 수정된필드 and value not in 수정된필드.values():
+
+                    print(f"[디버그] 필드: {field}, 값: {value}")  # <-- 여기!
+
                     수정된필드[field] = value
                     member[field] = value
                     member[f"{field}_기록"] = f"(기록됨: {value})"
