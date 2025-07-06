@@ -313,12 +313,21 @@ def update_member():
         sheet = get_member_sheet()
         db = sheet.get_all_records()
         headers = [h.strip().lower() for h in sheet.row_values(1)]
-        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명") is not None]
+
+
+     
+        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
+        # ✅ 계보도 대상자 추출
+        lineage_match = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", 요청문)
+        계보도_대상 = lineage_match.group(1) if lineage_match else None
+
+
 
         # 회원명 찾기
         name = None
+        # ✅ 계보도 대상자는 제외하고 회원명 찾기
         for candidate in sorted(member_names, key=lambda x: -len(x)):
-            if candidate and candidate in 요청문:
+            if candidate and candidate != 계보도_대상 and candidate in 요청문:
                 name = candidate
                 break
 
@@ -331,6 +340,16 @@ def update_member():
 
         row_index = matching_rows[0] + 2
         member = db[matching_rows[0]]
+
+        if lineage_match:
+            value = f"{lineage_match.group(1)} {lineage_match.group(2)}"
+            member["계보도"] = value
+            member["계보도_기록"] = f"(기록됨: {value})"
+            수정된필드 = {"계보도": value}
+        else:
+            수정된필드 = {}
+
+        
 
         # 수정
         updated_member, 수정된필드 = parse_request_and_update(요청문, member)
@@ -378,6 +397,20 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     }
         
     
+
+    # ✅ "계보도 다음 문구" 무조건 필드로 처리
+    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", data)
+    if 계보도_패턴:
+        value = f"{계보도_패턴.group(1)} {계보도_패턴.group(2)}"
+        member["계보도"] = value
+        member["계보도_기록"] = f"(기록됨: {value})"
+        수정된필드["계보도"] = value
+
+
+
+
+
+
 
     # 요청문에 명시된 키워드가 있는지 확인
     used_keywords = [k for k in field_map if k in data]
