@@ -17,10 +17,15 @@ from oauth2client.service_account import ServiceAccountCredentials
 from utils.sheets import get_order_sheet, get_member_info
 
 import requests
-
+import time
 from utils.sheets import get_order_sheet, get_member_info
 
+def some_function():
+    print("작업 시작")
+    time.sleep(1)
+    print("작업 완료")
 
+    
 
 # ✅ 환경 변수 로드
 
