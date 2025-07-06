@@ -1618,6 +1618,19 @@ def upload_to_drive(file_path, filename):
 
 
 # ✅ 이미지 업로드 및 시트 저장 API
+import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+def get_image_sheet():
+    scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+    creds = ServiceAccountCredentials.from_json_keyfile_name('credentials.json', scope)
+    client = gspread.authorize(creds)
+
+    sheet_name = os.getenv('IMAGE_MEMO_SHEET', '이미지메모')  # 환경변수에서 시트 이름 불러오기
+    return client.open(sheet_name).sheet1
+
+
 @app.route('/upload_image_memo', methods=['POST'])
 def upload_image_memo():
     if 'image' not in request.files:
