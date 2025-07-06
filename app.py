@@ -146,6 +146,8 @@ def get_product_order_sheet():
 def get_image_sheet():
     return get_worksheet("사진저장")
 
+def get_backup_sheet():
+    return get_worksheet("백업")
 
 
 # ✅ 환경 변수 로드 및 GPT API 키 설정
@@ -645,20 +647,28 @@ def delete_member():
         if not name:
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
+        # DB 시트
         sheet = get_member_sheet()
         data = sheet.get_all_records()
 
         for i, row in enumerate(data):
             if row.get('회원명') == name:
-                sheet.delete_rows(i + 2)  # 헤더 포함으로 인덱스 +2
-                return jsonify({"message": f"'{name}' 회원 삭제 완료"}), 200
+                # 삭제할 데이터 백업
+                backup_sheet = get_backup_sheet()
+                values = [[row.get(k, '') for k in row.keys()]]
+                backup_sheet.append_row(values[0])
+
+                # DB 시트에서 해당 행 삭제
+                sheet.delete_rows(i + 2)  # 헤더 포함
+
+                return jsonify({"message": f"'{name}' 회원 삭제 및 백업 완료"}), 200
 
         return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
 
     except Exception as e:
-        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+        
 
 
 
