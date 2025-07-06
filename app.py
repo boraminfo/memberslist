@@ -356,7 +356,10 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         "회원명": "회원명",
         "휴대폰번호": "휴대폰번호",
         "회원번호": "회원번호",
-        "계보도": "계보도"
+        "계보도": "계보도",
+        "비밀번호": "비밀번호"  # ✅ 필요시 추가
+    }
+        
     }
 
     # 요청문에 명시된 키워드가 있는지 확인
@@ -376,6 +379,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 value_raw = re.sub(r'\s+', ' ', value_raw)
                 # 더 강력한 후처리: 계보도 등에서 꼬리 명령어 제거
                 value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw).strip()
+
+
 
                 if field == "회원번호":
                     value = re.sub(r"[^\d]", "", value)
