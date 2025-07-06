@@ -360,7 +360,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         "비밀번호": "비밀번호"  # ✅ 필요시 추가
     }
         
-    }
+    
 
     # 요청문에 명시된 키워드가 있는지 확인
     used_keywords = [k for k in field_map if k in data]
