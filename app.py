@@ -279,6 +279,23 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
 
 
 
+
+
+
+def clean_value_expression(text: str) -> str:
+    particles = ['로', '으로', '은', '는', '을', '를']
+    for p in particles:
+        text = re.sub(rf'(\S+){p}(\W)', r'\1\2', text)
+        text = re.sub(rf'(\S+)\s+{p}(\W)', r'\1\2', text)
+    return text
+
+
+
+
+
+
+
+
 # ======================================================================================
 
 
@@ -287,6 +304,8 @@ def update_member():
     try:
         data = request.get_json(force=True)
         요청문 = data.get("요청문", "").strip()
+
+        요청문 = clean_value_expression(요청문)  # ✅ 추가
 
         if not 요청문:
             return jsonify({"error": "요청문이 비어 있습니다."}), 400
