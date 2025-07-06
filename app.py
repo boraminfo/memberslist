@@ -505,8 +505,8 @@ def parse_registration(text):
 
     # ✅ fallback 회원번호
     if not number:
-        number = str(uuid.uuid4())[:8]
-        print(f"[ℹ️DEBUG] fallback 회원번호 생성: {number}")
+        print("[ℹ️DEBUG] 회원번호 없이 등록됨")
+        number = ""
 
 
 
@@ -668,7 +668,7 @@ def delete_member():
     except Exception as e:
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-        
+
 
 
 
