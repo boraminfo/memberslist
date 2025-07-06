@@ -251,6 +251,22 @@ def find_member():
 
 
 
+def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
+    for attempt in range(1, max_retries + 1):
+        try:
+
+
+            sheet.update_cell(row, col, value)
+            return True
+        except gspread.exceptions.APIError as e:
+            if "429" in str(e):
+                print(f"[⏳ 재시도 {attempt}] 429 오류 → {delay}초 대기")
+                time.sleep(delay)
+                delay *= 2
+            else:
+                raise
+    print("[❌ 실패] 최대 재시도 초과")
+    return False
 
 
 
@@ -262,8 +278,7 @@ def find_member():
 @app.route("/update_member", methods=["POST"])
 def update_member():
     try:
-        raw_data = request.data.decode("utf-8")
-        data = json.loads(raw_data)
+        data = request.get_json(force=True)
         요청문 = data.get("요청문", "").strip()
 
         if not 요청문:
@@ -288,7 +303,6 @@ def update_member():
         if not matching_rows:
             return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
 
-
         row_index = matching_rows[0] + 2
         member = db[matching_rows[0]]
 
@@ -301,17 +315,11 @@ def update_member():
                 continue
             if key.strip().lower() in headers:
                 col = headers.index(key.strip().lower()) + 1
-
-
                 success = safe_update_cell(sheet, row_index, col, value)
                 if success:
                     수정결과.append({"필드": key, "값": value})
 
-
-
-
         return jsonify({"status": "success", "회원명": name, "수정": 수정결과}), 200
-
 
     except Exception as e:
         import traceback
@@ -319,23 +327,6 @@ def update_member():
         return jsonify({"error": str(e)}), 500
 
 
-
-def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
-    for attempt in range(1, max_retries + 1):
-        try:
-
-
-            sheet.update_cell(row, col, value)
-            return True
-        except gspread.exceptions.APIError as e:
-            if "429" in str(e):
-                print(f"[⏳ 재시도 {attempt}] 429 오류 → {delay}초 대기")
-                time.sleep(delay)
-                delay *= 2
-            else:
-                raise
-    print("[❌ 실패] 최대 재시도 초과")
-    return False
 
 
 # ========================================================================================
