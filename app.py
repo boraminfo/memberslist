@@ -961,6 +961,45 @@ def add_counseling():
         sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력"]
         action_keywords = ["저장", "기록", "입력"]
 
+
+
+
+
+
+
+        # ✅ "홍길동 메모 저장 오늘 금융교육 다녀옴" → DB 시트 메모 저장
+        if "메모" in text and any(kw in text for kw in action_keywords):
+            memo_pattern = re.match(r"([가-힣]{2,3})\s*메모\s*(저장|기록|입력)?\s*(.+)", text)
+            if memo_pattern:
+                member_name = memo_pattern.group(1)
+                memo_text = memo_pattern.group(3).strip()
+
+                # DB 시트에서 회원 찾기 및 메모 저장
+                sheet = get_member_sheet()
+                db = sheet.get_all_records()
+                headers = [h.strip().lower() for h in sheet.row_values(1)]
+                matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == member_name]
+
+                if not matching_rows:
+                    return jsonify({"message": f"'{member_name}' 회원을 찾을 수 없습니다."})
+
+                row_index = matching_rows[0] + 2
+                if "메모" in headers:
+                    col_index = headers.index("메모") + 1
+                    safe_update_cell(sheet, row_index, col_index, memo_text)
+                    return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
+                else:
+                    return jsonify({"message": "'메모' 필드가 시트에 존재하지 않습니다."})
+
+
+
+
+
+
+
+
+
+
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
             return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '직접입력' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
