@@ -359,16 +359,10 @@ def update_member():
         row_index = matching_rows[0] + 2
         member = db[matching_rows[0]]
 
-        if lineage_match:
-            value = f"{lineage_match.group(1)} {lineage_match.group(2)}"
-            member["계보도"] = value
-            member["계보도_기록"] = f"(기록됨: {value})"
-            수정된필드 = {"계보도": value}
-        else:
-            수정된필드 = {}
 
         
-
+        # ✅ 계보도 등 모든 필드는 parse_request_and_update 에서만 처리
+        수정된필드 = {}
         # 수정
         updated_member, 수정된필드 = parse_request_and_update(요청문, member)
 
@@ -461,8 +455,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 value_raw = match.group("value").strip()
                 value_raw = re.sub(r'\s+', ' ', value_raw)
                 # 더 강력한 후처리: 계보도 등에서 꼬리 명령어 제거
-                value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|해줘|바꿔줘|바꿔|바꿈)?$", "", value_raw).strip()
-
+                value = re.sub(r"(으로|로)?\s*(다시)?\s*(수정|변경|해줘|해|바꿔줘|바꿔|바꿈)?[^\w가-힣]*$", "", value_raw).strip()
 
 
 
@@ -939,6 +932,18 @@ def save_to_sheet(sheet_name, member_name, content):
     except Exception as e:
         print(f"[시트 저장 오류: {sheet_name}] {e}")
         return False
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # ✅ /add_counseling 처리 API (자연어 입력 기반 저장 + mode 분기)
