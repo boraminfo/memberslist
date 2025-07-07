@@ -425,12 +425,20 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     
 
     # ✅ "계보도 다음 문구" 무조건 필드로 처리
-    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", data)
+    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,})(?:\s*(좌측|우측|라인|왼쪽|오른쪽))?", data)
     if 계보도_패턴:
-        value = f"{계보도_패턴.group(1)} {계보도_패턴.group(2)}"
+        이름 = 계보도_패턴.group(1)
+        방향 = 계보도_패턴.group(2)
+
+        if 방향:
+            value = f"{이름} {방향}"
+        else:
+            value = 이름  # 방향이 없을 경우, 이름만 기록
+
         member["계보도"] = value
         member["계보도_기록"] = f"(기록됨: {value})"
         수정된필드["계보도"] = value
+
 
 
     계보도_이름 = 계보도_패턴.group(1) if 계보도_패턴 else None
@@ -492,21 +500,32 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
-
                 elif field == "계보도":
                     # ✅ '강소희우측' → '강소희 우측' 형태로 정리
                     lineage_match = re.match(r"([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", value)
                     if lineage_match:
                         value = f"{lineage_match.group(1)} {lineage_match.group(2)}"
                     else:
-                        # fallback: 중복 공백 제거
-                        value = re.sub(r"\s+", " ", value)
+                        # ✅ '강소희 수정해 줘' 같은 경우 → '강소희'로 정리
+                        name_only = re.match(r"([가-힣]{2,})", value)
+                        if name_only:
+                            value = name_only.group(1)
+                        else:
+                            value = re.sub(r"\s+", " ", value)
 
 
-                if field not in 수정된필드 and value not in 수정된필드.values():
-                    수정된필드[field] = value
-                    member[field] = value
-                    member[f"{field}_기록"] = f"(기록됨: {value})"
+
+
+
+
+
+
+
+
+
+
+
+
 
     else:
         # 키워드가 없을 경우 추론
