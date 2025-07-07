@@ -182,6 +182,7 @@ def get_worksheet(sheet_name):
 field_map = {
     "휴대폰번호": "휴대폰번호",
     "핸드폰": "휴대폰번호",
+    "계보도": "계보도",
     "주소": "주소",
     "회원번호": "회원번호",
     "이름": "회원명",
@@ -300,7 +301,7 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
 
 
 def clean_value_expression(text: str) -> str:
-    particles = ['로', '으로', '은', '는', '을', '를']
+    particles = ['로', '으로', '은', '는', '을', '를', '수정해 줘']
     for p in particles:
         text = re.sub(rf'(\S+){p}(\W)', r'\1\2', text)
         text = re.sub(rf'(\S+)\s+{p}(\W)', r'\1\2', text)
@@ -335,7 +336,7 @@ def update_member():
      
         member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
         # ✅ 계보도 대상자 추출
-        lineage_match = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", 요청문)
+        lineage_match = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", 요청문)
         계보도_대상 = lineage_match.group(1) if lineage_match else None
 
 
@@ -424,7 +425,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     
 
     # ✅ "계보도 다음 문구" 무조건 필드로 처리
-    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", data)
+    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", data)
     if 계보도_패턴:
         value = f"{계보도_패턴.group(1)} {계보도_패턴.group(2)}"
         member["계보도"] = value
@@ -494,7 +495,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
                 elif field == "계보도":
                     # ✅ '강소희우측' → '강소희 우측' 형태로 정리
-                    lineage_match = re.match(r"([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽)", value)
+                    lineage_match = re.match(r"([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", value)
                     if lineage_match:
                         value = f"{lineage_match.group(1)} {lineage_match.group(2)}"
                     else:
@@ -536,7 +537,7 @@ def infer_field_from_value(value: str) -> str | None:
         return "휴대폰번호"
     elif re.fullmatch(r"\d{4,8}", value):
         return "회원번호"
-    elif re.search(r"(좌측|우측|중앙|왼쪽|오른쪽)", value):
+    elif re.search(r"(좌측|우측|라인|왼쪽|오른쪽)", value):
         return "계보도"
 
     elif re.fullmatch(r"[a-zA-Z0-9@!#%^&*]{6,20}", value):
@@ -623,7 +624,7 @@ def parse_registration(text):
     else:
 
         # ✅ 계보도 추정
-        위치어 = ["좌측", "우측", "중앙", "왼쪽", "오른쪽"]
+        위치어 = ["좌측", "우측", "라인", "왼쪽", "오른쪽"]
         불필요_계보도 = ["회원등록", "회원", "등록"]
         필터링된 = [w for w in korean_words if w not in 불필요_계보도]
 
