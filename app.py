@@ -967,14 +967,13 @@ def add_counseling():
 
 
 
-        # ✅ "홍길동 메모 저장 오늘 금융교육 다녀옴" → DB 시트 메모 저장
-        if "메모" in text and any(kw in text for kw in action_keywords):
-            memo_pattern = re.match(r"([가-힣]{2,3})\s*메모\s*(저장|기록|입력)?\s*(.+)", text)
+        # ✅ 회원명 + 메모 요청 → DB 시트로 강제 분기 (상담일지/개인메모/활동일지 키워드 없을 때만)
+        if re.match(r"([가-힣]{2,3})\s*메모\s*(.+)?", text) and not any(kw in text for kw in ["상담일지", "개인메모", "활동일지"]):
+            memo_pattern = re.match(r"([가-힣]{2,3})\s*메모\s*(.+)?", text)
             if memo_pattern:
                 member_name = memo_pattern.group(1)
-                memo_text = memo_pattern.group(3).strip()
+                memo_text = memo_pattern.group(2).strip() if memo_pattern.group(2) else ""
 
-                # DB 시트에서 회원 찾기 및 메모 저장
                 sheet = get_member_sheet()
                 db = sheet.get_all_records()
                 headers = [h.strip().lower() for h in sheet.row_values(1)]
@@ -990,6 +989,8 @@ def add_counseling():
                     return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
                 else:
                     return jsonify({"message": "'메모' 필드가 시트에 존재하지 않습니다."})
+
+
 
 
 
