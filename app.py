@@ -983,7 +983,9 @@ def add_counseling():
         if matched_sheet == "회원메모":
             sheet = get_member_sheet()
             db = sheet.get_all_records()
+
             headers = [h.strip().lower() for h in sheet.row_values(1)]
+            
             matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == member_name]
 
             if not matching_rows:
@@ -991,14 +993,20 @@ def add_counseling():
 
             row_index = matching_rows[0] + 2
 
-            if "메모" in [h.lower() for h in headers]:
-                col_index = [h.lower() for h in headers].index("메모") + 1
 
 
+
+
+            if "메모".lower() in headers:
+                col_index = headers.index("메모".lower()) + 1
                 safe_update_cell(sheet, row_index, col_index, text)
                 return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
             else:
                 return jsonify({"message": "'메모' 필드가 시트에 존재하지 않습니다."})
+
+
+
+
 
 
 
