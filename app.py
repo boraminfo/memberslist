@@ -1513,6 +1513,14 @@ def parse_and_save_order():
 
 
 
+
+# 변경내용 있음
+
+
+
+
+
+
 # 서버 실행
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
