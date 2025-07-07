@@ -990,8 +990,11 @@ def add_counseling():
                 return jsonify({"message": f"'{member_name}' 회원을 찾을 수 없습니다."})
 
             row_index = matching_rows[0] + 2
-            if "메모" in headers:
-                col_index = headers.index("메모") + 1
+
+            if "메모" in [h.lower() for h in headers]:
+                col_index = [h.lower() for h in headers].index("메모") + 1
+
+
                 safe_update_cell(sheet, row_index, col_index, text)
                 return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
             else:
