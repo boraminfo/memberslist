@@ -979,33 +979,36 @@ def add_counseling():
         text = text.strip()
         text = re.sub(r'^[:：]\s*', '', text)
 
+
+
+
+
+
+
+
         # ✅ 회원메모는 DB 시트의 메모 필드에 저장
         if matched_sheet == "회원메모":
             sheet = get_member_sheet()
             db = sheet.get_all_records()
-
             headers = [h.strip().lower() for h in sheet.row_values(1)]
-            
-            matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == member_name]
 
+            matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == member_name]
             if not matching_rows:
                 return jsonify({"message": f"'{member_name}' 회원을 찾을 수 없습니다."})
 
             row_index = matching_rows[0] + 2
 
-
-
-
-
             if "메모".lower() in headers:
                 col_index = headers.index("메모".lower()) + 1
-                safe_update_cell(sheet, row_index, col_index, text)
-                return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
+                success = safe_update_cell(sheet, row_index, col_index, text)
+                print("메모 업데이트 시도:", row_index, col_index, text, "성공 여부:", success)
+
+                if success:
+                    return jsonify({"message": f"{member_name}님의 메모가 DB 시트에 저장되었습니다."})
+                else:
+                    return jsonify({"message": f"'{member_name}' 메모 저장 실패 (safe_update_cell 실패)."})
             else:
                 return jsonify({"message": "'메모' 필드가 시트에 존재하지 않습니다."})
-
-
-
 
 
 
@@ -1032,7 +1035,8 @@ def add_counseling():
 
 
     
-    
+
+            
     
     
     
