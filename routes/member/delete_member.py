@@ -15,10 +15,11 @@ def delete_member():
 
         for i, row in enumerate(data):
             if row.get('회원명') == name:
+                # 백업 시트에 2행에 복사 (헤더 아래)
                 # 백업 시트에 복사
                 backup_sheet = get_worksheet("백업")
                 values = [[row.get(k, '') for k in row.keys()]]
-                backup_sheet.append_row(values[0])
+                backup_sheet.insert_rows(values, 2)
 
                 # 원래 시트에서 삭제
                 sheet.delete_rows(i + 2)  # 헤더 포함 1행 보정
