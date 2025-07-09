@@ -16,6 +16,7 @@ def parse_request_and_update(text: str, member: dict) -> tuple:
         "주소": "주소",
         "직업": "근무처",
         "직장": "근무처",
+        "메모": "메모",
     }
 
     # ✅ 계보도 패턴 우선 적용
