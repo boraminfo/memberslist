@@ -46,8 +46,9 @@ def select_user(env_vars):
     print(f"[1] {env_vars.get('USER1_NAME')}")
     print(f"[2] {env_vars.get('USER2_NAME')}")
     print(f"[3] {env_vars.get('USER3_NAME')}")
+    print(f"[4] {env_vars.get('USER4_NAME')}")    
     print("==============================")
-    choice = input("번호를 입력하세요 (1~3): ").strip()
+    choice = input("번호를 입력하세요 (1~4): ").strip()
     return {
         "name": env_vars.get(f"USER{choice}_NAME"),
         "email": env_vars.get(f"USER{choice}_EMAIL"),
