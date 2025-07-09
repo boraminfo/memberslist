@@ -12,14 +12,18 @@ import pytz
 load_dotenv()
 
 # 🔐 인증 클라이언트 생성
+import json
+
 def get_gspread_client():
     scope = [
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    creds_dict = json.loads(creds_json)
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     return gspread.authorize(creds)
+
 
 # 📄 공통 시트 접근
 def get_worksheet(sheet_name):
