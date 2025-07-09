@@ -6,12 +6,6 @@ add_counseling_bp = Blueprint("add_counseling_bp", __name__)
 
 
 
-
-
-
-
-
-
 @add_counseling_bp.route("/add_counseling", methods=["POST"])
 def add_counseling():
     try:
@@ -20,6 +14,8 @@ def add_counseling():
 
         # 파싱
         member_name, sheet_name, content = parse_counseling_command(text)
+
+        content = content.replace(".", "").strip()
 
         # 회원메모는 DB 시트의 메모 필드에 저장
         if sheet_name == "회원메모":
