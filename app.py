@@ -962,6 +962,11 @@ def add_counseling():
         sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력", "회원메모"]
         action_keywords = ["저장", "기록", "입력"]
 
+        text = text.replace(".", "").strip()
+
+
+
+
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
             return jsonify({"message": "저장하려면 '상담일지', '개인메모', '활동일지', '회원메모' 중 하나와 '저장', '기록', '입력' 같은 동작어를 함께 포함해 주세요."})
 
