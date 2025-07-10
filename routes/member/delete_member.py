@@ -32,3 +32,35 @@ def delete_member():
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
 
+
+
+
+
+
+
+# ✅ intent_router에서 직접 호출되는 함수
+def delete_member_from_text(text: str):
+    try:
+        name = text.strip()
+        if not name:
+            return jsonify({"error": "회원명을 입력해 주세요."}), 400
+
+        sheet = get_worksheet("DB")  # ✅ 통일
+        records = sheet.get_all_records()
+
+        for i, row in enumerate(records):
+            if row.get("회원명") == name:
+                # ✅ 백업 시트에 2행 삽입
+                backup_sheet = get_worksheet("백업")
+                values = [[row.get(k, '') for k in row.keys()]]
+                backup_sheet.insert_rows(values, 2)
+
+                # ✅ 실제 삭제
+                sheet.delete_rows(i + 2)
+                return jsonify({"message": f"'{name}' 회원 삭제 및 백업 완료"}), 200
+
+        return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+

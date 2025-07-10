@@ -44,6 +44,9 @@ def register_blueprints(app):
     app.register_blueprint(sheet_bp)
 
 
+    # ✅ Intent Router (자연어 기반 자동 분기)
+    from routes.intent_router import router as intent_router
+    app.register_blueprint(intent_router, url_prefix="/intent")
 
 
 # ✅ 홈 라우트
@@ -61,4 +64,4 @@ if __name__ == "__main__":
 
 
 
-# 잘되면
+

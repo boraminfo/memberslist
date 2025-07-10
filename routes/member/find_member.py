@@ -45,3 +45,30 @@ def find_member():
         return jsonify({"error": str(e)}), 500
 
 
+
+
+
+
+# ✅ intent_router에서 직접 호출되는 함수
+def find_member_from_text(text: str):
+    try:
+        name = text.strip()
+        if not name:
+            return jsonify({"error": "회원명을 입력해 주세요."}), 400
+
+        sheet = get_worksheet("DB")  # ← 여기서 get_member_sheet() 대신 통일
+        db = sheet.get_all_values()
+        headers, rows = db[0], db[1:]
+
+        for row in rows:
+            row_dict = dict(zip(headers, row))
+            if row_dict.get("회원명") == name:
+                return jsonify(row_dict), 200
+
+        return jsonify({"error": f"{name} 회원을 찾을 수 없습니다."}), 404
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
