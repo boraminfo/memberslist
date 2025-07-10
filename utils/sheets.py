@@ -62,11 +62,20 @@ def get_member_info(member_name):
             return row.get("회원번호", ""), row.get("휴대폰번호", "")
     return "", ""
 
+
+
+
+
+
+
+
 # ✅ 안전한 셀 업데이트 (재시도 포함)
 def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
+    print(f"[safe_update_cell] 호출됨: row={row}, col={col}, value={value}")
     for attempt in range(1, max_retries + 1):
         try:
             sheet.update_cell(row, col, value)
+            print(f"[✅ 성공] 셀 업데이트 완료 (row={row}, col={col})")
             return True
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
@@ -74,9 +83,14 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
                 time.sleep(delay)
                 delay *= 2
             else:
-                raise
-    print("[❌ 실패] 최대 재시도 초과")
+                print(f"[❌ API 오류] {e}")
+                break
+        except Exception as e:
+            print(f"[❌ 예외 발생] {e}")
+            break
+    print("[❌ 실패] 최대 재시도 초과 또는 예외 발생")
     return False
+
 
 
 
