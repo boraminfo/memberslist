@@ -1,12 +1,7 @@
 from flask import Blueprint, jsonify
 from utils.sheets import get_worksheet
 
-
-
-
 delete_order_req_bp = Blueprint("delete_order_req_bp", __name__)
-
-
 
 
 

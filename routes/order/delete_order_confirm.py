@@ -5,12 +5,6 @@ import re
 delete_order_conf_bp = Blueprint("delete_order_conf_bp", __name__)
 
 
-
-
-
-
-
-
 @delete_order_conf_bp.route("/delete_order_confirm", methods=["POST"])
 def delete_order_confirm():
     try:

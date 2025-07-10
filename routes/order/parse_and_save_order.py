@@ -4,10 +4,8 @@ from utils.config import GOOGLE_SHEET_TITLE, GOOGLE_CREDENTIALS_PATH
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
+
 parse_order_bp = Blueprint("parse_order", __name__)  # 블루프린트 이름 반드시 일치
-
-
-
 
 
 
