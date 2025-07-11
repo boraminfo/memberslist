@@ -53,10 +53,14 @@ def find_member():
 # ✅ intent_router에서 직접 호출되는 함수
 def find_member_from_text(text: str):
     try:
+        print("[DEBUG] 요청문:", text)
+
         # "요약정보" 키워드 포함 여부 판단
         summary_mode = "요약정보" in text
-        name = text.replace("요약정보", "").strip().replace(" ", "")
+        print("[DEBUG] 요약모드:", summary_mode)
 
+        name = text.replace("요약정보", "").strip().replace(" ", "")
+        print("[DEBUG] 추출된 이름:", name)
 
         if not name:
             return jsonify({"error": "회원명을 입력해 주세요."}), 400
