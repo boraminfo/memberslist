@@ -24,6 +24,10 @@ def get_gspread_client():
     ]
     creds_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "credentials.json")
     
+    # 🔽 여기에 로그 추가!
+    print(f"[🔍 인증 파일 경로 확인] creds_path = {creds_path}")
+
+
     # 실제 파일에서 JSON 읽기
     with open(creds_path, "r", encoding="utf-8") as f:
         creds_dict = json.load(f)
