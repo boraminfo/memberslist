@@ -55,7 +55,8 @@ def find_member_from_text(text: str):
     try:
         # "요약정보" 키워드 포함 여부 판단
         summary_mode = "요약정보" in text
-        name = text.replace("요약정보", "").strip()
+        name = text.replace("요약정보", "").strip().replace(" ", "")
+
 
         if not name:
             return jsonify({"error": "회원명을 입력해 주세요."}), 400
@@ -66,7 +67,8 @@ def find_member_from_text(text: str):
 
         for row in rows:
             row_dict = dict(zip(headers, row))
-            if row_dict.get("회원명") == name:
+            if row_dict.get("회원명", "").replace(" ", "") == name:
+
                 if summary_mode:
                     fields = [
                         "회원명", "휴대폰번호", "회원번호",
