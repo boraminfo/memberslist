@@ -1,3 +1,6 @@
+import re
+
+
 def detect_intent(text: str) -> str:
     """
     자연어 문장에서 의도를 추출합니다.
