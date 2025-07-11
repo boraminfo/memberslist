@@ -9,25 +9,41 @@ from routes.member.find_member import find_member_from_text
 
 router = Blueprint("intent_router", __name__)
 
+
+
 @router.route("/handle_member_intent", methods=["POST"])
 def handle_member_intent():
-    data = request.get_json()
-    text = data.get("요청문", "").strip()
+    try:
+        if not request.is_json:
+            print("[요청 오류] JSON이 아닙니다.")
+            return jsonify({"error": "요청이 JSON 형식이 아닙니다."}), 400
 
-    intent = detect_intent(text)
+        data = request.get_json(force=True)
+        print("[요청 데이터]", data)
 
-    if intent == "등록":
-        return save_member_from_text(text)
-    elif intent == "수정":
-        return update_member_from_text(text)
-    elif intent == "삭제":
-        return delete_member_from_text(text)
-    elif intent == "조회":
-        return find_member_from_text(text)
-    else:
-        return jsonify({
-            "message": "의도를 파악할 수 없습니다.",
-            "요청문": text
-        }), 400
+        text = data.get("요청문", "").strip()
+        print("[요청문]", text)
+
+        intent = detect_intent(text)
+        print("[분석된 intent]", intent)
+
+        if intent == "등록":
+            return save_member_from_text(text)
+        elif intent == "수정":
+            return update_member_from_text(text)
+        elif intent == "삭제":
+            return delete_member_from_text(text)
+        elif intent == "조회":
+            return find_member_from_text(text)
+        else:
+            return jsonify({
+                "message": "의도를 파악할 수 없습니다.",
+                "요청문": text
+            }), 400
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 

@@ -1,5 +1,3 @@
-import re
-
 def detect_intent(text: str) -> str:
     """
     자연어 문장에서 의도를 추출합니다.
@@ -7,9 +5,11 @@ def detect_intent(text: str) -> str:
     """
     text = text.strip()
 
-    if re.match(r"회원등록\s", text):
+    if "회원메모" in text and any(word in text for word in ["저장", "수정"]):
+        return "수정"  # ✅ 회원메모 관련 요청은 수정 분기로 처리
+    elif re.match(r"회원등록\s", text):
         return "등록"
-    elif re.match(r"\S+\s+수정\s", text):  # 예: "이판주 수정 ..."
+    elif any(word in text for word in ["수정", "바꿔", "바꿔줘", "변경", "바꾸기"]):
         return "수정"
     elif re.match(r"\S+\s+삭제", text):   # 예: "이판주 삭제"
         return "삭제"
@@ -17,5 +17,3 @@ def detect_intent(text: str) -> str:
         return "조회"
     else:
         return "기타"
-
-

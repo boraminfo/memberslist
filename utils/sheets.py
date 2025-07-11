@@ -11,6 +11,9 @@ import pytz
 # 🔄 .env 파일 로드 (필요한 경우)
 load_dotenv()
 
+
+
+
 # 🔐 인증 클라이언트 생성
 import json
 
@@ -19,10 +22,15 @@ def get_gspread_client():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-    creds_dict = json.loads(creds_json)
+    creds_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "credentials.json")
+    
+    # 실제 파일에서 JSON 읽기
+    with open(creds_path, "r", encoding="utf-8") as f:
+        creds_dict = json.load(f)
+
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     return gspread.authorize(creds)
+
 
 
 # 📄 공통 시트 접근
@@ -121,3 +129,37 @@ def save_to_sheet(sheet_name, member_name, content):
     except Exception as e:
         print(f"[시트 저장 오류: {sheet_name}] {e}")
         return False
+
+
+
+
+
+
+# ✅ 회원 정보 수정
+def update_member_in_sheet(name, updates: dict):
+    sheet = get_member_sheet()
+    all_data = sheet.get_all_values()
+    headers = all_data[0]
+    rows = all_data[1:]
+
+    for idx, row in enumerate(rows):
+        row_dict = dict(zip(headers, row))
+        if row_dict.get("회원명") == name:
+            row_index = idx + 2  # 실제 시트에서의 행 번호
+            수정결과 = []
+            for key, value in updates.items():
+                if key in headers:
+                    col = headers.index(key) + 1  # 열 번호
+                    from utils.sheets import safe_update_cell
+                    if safe_update_cell(sheet, row_index, col, value):
+                        수정결과.append({"필드": key, "값": value})
+            return {
+                "message": f"{name} 회원 정보가 수정되었습니다.",
+                "수정내용": 수정결과
+            }
+
+    return {"error": f"{name} 회원을 찾을 수 없습니다."}
+
+
+
+

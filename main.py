@@ -2,6 +2,8 @@ from flask import Flask
 from dotenv import load_dotenv
 import os
 
+
+
 # ✅ 환경변수 로드 (로컬에서만)
 if os.getenv("RENDER") is None:
     dotenv_path = os.path.abspath('.env')
@@ -10,6 +12,9 @@ if os.getenv("RENDER") is None:
 
 # ✅ Flask 앱 생성
 app = Flask(__name__)
+
+
+
 
 # ✅ Blueprint 등록 함수로 분리
 def register_blueprints(app):

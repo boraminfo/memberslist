@@ -30,6 +30,9 @@ def save_member():
 # ✅ intent_router에서 직접 호출되는 함수
 def save_member_from_text(text: str):
     try:
+        if not any(keyword in text for keyword in ["회원등록", "신규등록"]):
+            return jsonify({"error": "'회원등록' 또는 '신규등록' 문구가 포함된 요청만 처리합니다."}), 400
+
         name, number, phone, lineage = parse_registration(text)
         if not name:
             return jsonify({"error": "회원명을 추출할 수 없습니다"}), 400

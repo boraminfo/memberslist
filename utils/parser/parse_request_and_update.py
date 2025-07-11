@@ -1,49 +1,45 @@
 import re
+from utils.sheets import get_worksheet
 
-def parse_request_and_update(text: str, member: dict) -> tuple:
+def parse_update_request(text):
     """
-    자연어 문장에서 수정할 필드와 값을 추출하여 member 딕셔너리를 수정합니다.
-    반환: (수정된 member 딕셔너리, 수정된 필드 목록)
+    다양한 형태의 자연어에서 회원명과 수정 필드를 추출
     """
-    updated_fields = {}
+    # ✅ 회원메모 단독 처리 분기: 저장/수정 키워드 포함 시
+    if "회원메모" in text and any(kw in text for kw in ["저장", "수정"]):
+        return None, None  # 이후 상위 로직에서 메모 저장 분기로 처리 가능
 
-    field_map = {
-        "회원명": "회원명",
-        "휴대폰번호": "휴대폰번호",
-        "회원번호": "회원번호",
-        "계보도": "계보도",
-        "비밀번호": "비밀번호",
-        "주소": "주소",
-        "직업": "근무처",
-        "직장": "근무처",
-        "메모": "메모",
-    }
+    # 계보도 대상자 제외
+    lineage_match = re.search(r"계보도[를은는]?[ ]*([가-힣]{2,})", text)
+    exclude_name = lineage_match.group(1) if lineage_match else None
 
-    # ✅ 계보도 패턴 우선 적용
-    lineage_pattern = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽|라인)?", text)
-    if lineage_pattern:
-        name_part = lineage_pattern.group(1)
-        direction = lineage_pattern.group(2) or ""
-        value = f"{name_part} {direction}".strip()
-        member["계보도"] = value
-        updated_fields["계보도"] = value
+    sheet = get_worksheet("DB")
+    db = sheet.get_all_records()
+    member_names = [row.get("회원명", "").strip() for row in db if row.get("회원명")]
+    member_names = sorted(set(member_names), key=len, reverse=True)
 
-    # ✅ 일반 필드 패턴 처리
-    for keyword, field in field_map.items():
-        pattern = rf"{keyword}(?:를|은|는|이|:|：)?\s*(?P<value>[\w가-힣\d\-@!#%^&*.]+)"
-        for match in re.finditer(pattern, text):
-            value = match.group("value").strip()
-            if field == "휴대폰번호":
-                phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
-                value = phone_match.group(0) if phone_match else value
-            elif field == "회원번호":
-                value = re.sub(r"[^\d]", "", value)
-            elif field == "계보도":
-                continue  # 위에서 이미 처리됨
+    name = next((n for n in member_names if n != exclude_name and n in text), None)
 
-            member[field] = value
-            updated_fields[field] = value
+    # 기본 정규식 방식
+    match = re.search(rf"{name}의\s*(\S+)\s*를\s*(.+?)\s*(으로|로)?\s*(바꿔|변경|수정)", text) if name else None
+    if match:
+        field = match.group(1).strip()
+        value = match.group(2).strip()
+        return name, {field: value}
 
-    return member, updated_fields
+    # ✅ 간단한 패턴 대응: "홍길동 수정 010-1234-7777"
+    if name and re.search(r"수정|변경|바꿔", text):
+        phone_match = re.search(r"010[-\d]{7,9}", text)
+        if phone_match:
+            return name, {"휴대폰번호": phone_match.group()}
 
+        # 🔢 숫자만 있을 경우 → 회원번호로 간주
+        num_match = re.search(r"\b\d{4,8}\b", text)
+        if num_match:
+            return name, {"회원번호": num_match.group()}
 
+    # ❌ 회원명 없이 시작한 경우 → 중단
+    if not name:
+        return None, None  # 회원명 없음 → 중단
+
+    return name, None
