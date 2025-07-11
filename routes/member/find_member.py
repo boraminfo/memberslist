@@ -49,26 +49,40 @@ def find_member():
 
 
 
+
 # ✅ intent_router에서 직접 호출되는 함수
 def find_member_from_text(text: str):
     try:
-        name = text.strip()
+        # "요약정보" 키워드 포함 여부 판단
+        summary_mode = "요약정보" in text
+        name = text.replace("요약정보", "").strip()
+
         if not name:
             return jsonify({"error": "회원명을 입력해 주세요."}), 400
 
-        sheet = get_worksheet("DB")  # ← 여기서 get_member_sheet() 대신 통일
+        sheet = get_worksheet("DB")
         db = sheet.get_all_values()
         headers, rows = db[0], db[1:]
 
         for row in rows:
             row_dict = dict(zip(headers, row))
             if row_dict.get("회원명") == name:
-                return jsonify(row_dict), 200
+                if summary_mode:
+                    fields = [
+                        "회원명", "휴대폰번호", "회원번호",
+                        "비밀번호", "계보도", "근무처",
+                        "메모", "주소", "코드"
+                    ]
+                    summary = {key: row_dict.get(key, "") for key in fields}
+                    return jsonify({"요약정보": summary}), 200
+                else:
+                    return jsonify(row_dict), 200
 
         return jsonify({"error": f"{name} 회원을 찾을 수 없습니다."}), 404
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
