@@ -22,18 +22,25 @@ def get_gspread_client():
         "https://spreadsheets.google.com/feeds",
         "https://www.googleapis.com/auth/drive"
     ]
-    creds_path = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON", "credentials.json")
+
+    creds_env = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     
-    # 🔽 여기에 로그 추가!
-    print(f"[🔍 인증 파일 경로 확인] creds_path = {creds_path}")
+    # 🔍 어떤 형식인지 로그로 확인
+    print(f"[🔍 인증 파일/내용 확인] 시작 - 앞 50자: {creds_env[:50] if creds_env else 'None'}")
 
-
-    # 실제 파일에서 JSON 읽기
-    with open(creds_path, "r", encoding="utf-8") as f:
-        creds_dict = json.load(f)
+    if creds_env and creds_env.strip().startswith("{"):
+        # ✅ 환경변수에 JSON 문자열이 직접 들어있는 경우
+        creds_dict = json.loads(creds_env)
+    else:
+        # ✅ 환경변수에 파일 경로만 들어있는 경우 (예: credentials.json)
+        creds_path = creds_env or "credentials.json"
+        print(f"[🔍 인증 파일 경로 사용] creds_path = {creds_path}")
+        with open(creds_path, "r", encoding="utf-8") as f:
+            creds_dict = json.load(f)
 
     creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
     return gspread.authorize(creds)
+
 
 
 
