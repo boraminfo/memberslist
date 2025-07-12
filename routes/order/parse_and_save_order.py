@@ -77,14 +77,88 @@ def parse_and_save_order():
 
 
 
+import json
+import re
+
 def save_order_from_text(text: str):
     try:
-        parsed = parse_order_text(text)
-        save_order_to_sheet(parsed)
+        print("[요청문 입력]", text)
+        lines = text.strip().split('\n')
+        first_line = lines[0].strip()
+        json_text = '\n'.join(lines[1:]).strip()
+
+        # 1. 회원명 추출
+        member_match = re.match(r"(\S+)", first_line)
+        member_name = member_match.group(1) if member_match else "알수없음"
+
+        # 2. JSON 파싱
+        orders = json.loads(json_text)
+
+        # 3. 필드 보완
+        for order in orders:
+            order["회원명"] = member_name
+            order["결재방법"] = order.get("결재방법", "카드")
+            order["수령확인"] = order.get("수령확인", "미입력")
+
+        # 4. 시트에 저장
+        save_order_list_to_sheet(orders)
+
         return jsonify({
             "status": "success",
-            "message": f"{parsed.get('회원명', '회원')}님의 주문이 저장되었습니다.",
-            "parsed": parsed
+            "message": f"{member_name}님의 주문이 {len(orders)}건 저장되었습니다.",
+            "orders": orders
         })
+
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+
+
+
+
+def save_order_list_to_sheet(orders):
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+    creds = ServiceAccountCredentials.from_json_keyfile_name(GOOGLE_CREDENTIALS_PATH, scope)
+    client = gspread.authorize(creds)
+
+    ss = client.open(GOOGLE_SHEET_TITLE)
+    db_sheet = ss.worksheet("DB")
+    order_sheet = ss.worksheet("제품주문")
+
+    # DB 조회
+    members = db_sheet.get_all_records()
+
+    for item in orders:
+        name = item.get("회원명", "")
+        member_number = ""
+        member_phone = ""
+        for m in members:
+            if m.get("회원명") == name:
+                member_number = m.get("회원번호", "")
+                member_phone = m.get("휴대폰번호", "")
+                break
+
+        row = [
+            item.get("주문일자", ""),
+            name,
+            member_number,
+            member_phone,
+            item.get("제품명", ""),
+            item.get("제품가격", "0"),
+            item.get("PV", "0"),
+            item.get("결재방법", ""),
+            item.get("주문자_고객명", name),
+            item.get("주문자_휴대폰번호", member_phone),
+            item.get("배송처", ""),
+            item.get("수령확인", "미입력")
+        ]
+        order_sheet.insert_row(row, 2, value_input_option="USER_ENTERED")
+
+
+
