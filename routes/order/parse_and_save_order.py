@@ -70,3 +70,21 @@ def parse_and_save_order():
         })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+
+
+def save_order_from_text(text: str):
+    try:
+        parsed = parse_order_text(text)
+        save_order_to_sheet(parsed)
+        return jsonify({
+            "status": "success",
+            "message": f"{parsed.get('회원명', '회원')}님의 주문이 저장되었습니다.",
+            "parsed": parsed
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500

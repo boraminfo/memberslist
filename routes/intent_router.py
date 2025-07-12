@@ -7,6 +7,9 @@ from routes.member.update_member import update_member_from_text
 from routes.member.delete_member import delete_member_from_text
 from routes.member.find_member import find_member_from_text
 
+from routes.order.parse_and_save_order import save_order_from_text
+
+
 router = Blueprint("intent_router", __name__)
 
 
@@ -35,6 +38,10 @@ def handle_member_intent():
             return delete_member_from_text(text)
         elif intent == "조회":
             return find_member_from_text(text)
+        elif intent == "주문":
+            return save_order_from_text(text)
+
+            
         else:
             return jsonify({
                 "message": "의도를 파악할 수 없습니다.",
