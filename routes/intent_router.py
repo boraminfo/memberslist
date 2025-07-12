@@ -21,10 +21,18 @@ def handle_member_intent():
             print("[요청 오류] JSON이 아닙니다.")
             return jsonify({"error": "요청이 JSON 형식이 아닙니다."}), 400
 
-        data = request.get_json(force=True)
+        try:
+            data = request.get_json(force=True)
+        except Exception as e:
+            print("[JSON 파싱 오류]", e)
+            return jsonify({"error": "유효하지 않은 JSON 형식입니다.", "details": str(e)}), 400
+
         print("[요청 데이터]", data)
 
         text = data.get("요청문", "").strip()
+        if not text:
+            return jsonify({"error": "요청문이 비어 있습니다."}), 400
+
         print("[요청문]", text)
 
         intent = detect_intent(text)
@@ -40,8 +48,6 @@ def handle_member_intent():
             return find_member_from_text(text)
         elif intent == "주문":
             return save_order_from_text(text)
-
-            
         else:
             return jsonify({
                 "message": "의도를 파악할 수 없습니다.",
@@ -52,5 +58,6 @@ def handle_member_intent():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
