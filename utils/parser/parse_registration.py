@@ -25,9 +25,14 @@ def parse_registration(text: str):
             number = fallback_number.group(1)
 
     # ✅ 한글 이름 추출 (회원명 또는 첫 번째 한글 단어)
-    korean_words = re.findall(r"[가-힣]{2,}", text)
+    # ✅ parse_registration 내 name 추출 개선
+    korean_words = [w for w in re.findall(r"[가-힣]{2,}", text) if w not in ["회원등록", "신규등록"]]
+    print(f"[korean_words] = {korean_words}")  # 🔍 이 줄로 실제 어떤 단어가 추출됐는지 확인
+
+
     if korean_words:
         name = korean_words[0]
+
 
     # ✅ 계보도 추출 (예: 강소희 우측, 임채영 좌측 등)
     lineage_match = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|왼쪽|오른쪽|라인)?", text)

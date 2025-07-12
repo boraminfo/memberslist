@@ -11,12 +11,18 @@ save_member_bp = Blueprint("save_member", __name__)
 def save_member():
     try:
         req = request.get_json()
-        요청문 = req.get("요청문") or req.get("회원명", "")
+        요청문 = req.get("요청문")
+        회원명 = req.get("회원명")
 
-        if not 요청문:
-            return jsonify({"error": "입력 문장이 없습니다"}), 400
+        if not 요청문 and not 회원명:
+            return jsonify({"error": "요청문 또는 회원명이 필요합니다."}), 400
 
-        return save_member_from_text(요청문)  # ✅ 공통 함수로 위임
+        # 요청문이 없으면 생성
+        if not 요청문 and 회원명:
+            요청문 = f"{회원명} 회원등록"
+
+        # ✅ 회원명 명시되어 있으면 넘겨줌 (정규식 무시)
+        return save_member_from_text(요청문, override_name=회원명)
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -27,16 +33,58 @@ def save_member():
 
 
 
+
+
 # ✅ intent_router에서 직접 호출되는 함수
-def save_member_from_text(text: str):
+import re
+from flask import jsonify
+
+
+def extract_member_name(text: str):
+    print(f"[extract_member_name 진입] 원본: {text}")
+    for keyword in ["회원등록", "신규등록"]:
+        text = text.replace(keyword, "")
+    name = text.strip()
+    print(f"[정제 후 name] = {name}")
+    if re.fullmatch(r"[가-힣]{2,5}", name):
+        return name
+    return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def save_member_from_text(text: str, override_name: str = None):
     try:
-        if not any(keyword in text for keyword in ["회원등록", "신규등록"]):
+        print(f"[요청문] text = {text}")
+        print(f"[override_name] = {override_name}")
+
+        if not re.search(r"(회원등록|신규등록)", text):
             return jsonify({"error": "'회원등록' 또는 '신규등록' 문구가 포함된 요청만 처리합니다."}), 400
 
-        name, number, phone, lineage = parse_registration(text)
-        if not name:
-            return jsonify({"error": "회원명을 추출할 수 없습니다"}), 400
+        name = override_name or extract_member_name(text)
+        print(f"[추출된 회원명] name = {name}")
 
+        name_from_parser, number, phone, lineage = parse_registration(text)
+        print(f"[parse_registration 결과] name_from_parser = {name_from_parser}, number = {number}, phone = {phone}, lineage = {lineage}")
+
+        if not name or name in ["회원등록", "신규등록"]:
+            return jsonify({"error": "회원명을 추출할 수 없습니다."}), 400
+
+
+        # ✅ 시트 처리
         sheet = get_member_sheet()
         headers = [h.strip() for h in sheet.row_values(1)]
         rows = sheet.get_all_records()
@@ -68,6 +116,9 @@ def save_member_from_text(text: str):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+
 
 
 

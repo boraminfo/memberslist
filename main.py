@@ -59,6 +59,7 @@ def register_blueprints(app):
 def home():
     return "✅ Flask 서버가 실행 중입니다."
 
+app.run(debug=True)
 
 
 
@@ -71,7 +72,6 @@ if __name__ == "__main__":
 
 
 
-# 수정이 있음
 
 
 
