@@ -193,11 +193,14 @@ def save_orders_to_sheet(회원명, orders):
 
     member_records = db_sheet.get_all_records()
 
+    # 자연어에서 불필요한 키워드 제거
+    clean_회원명 = 회원명.replace("제품주문", "").replace("저장", "").strip()
+
     # 회원 정보 조회
     회원번호 = ""
     회원_휴대폰번호 = ""
     for record in member_records:
-        if record.get("회원명") == 회원명:
+        if record.get("회원명") == clean_회원명:
             회원번호 = record.get("회원번호", "")
             회원_휴대폰번호 = record.get("휴대폰번호", "")
             break
@@ -210,7 +213,7 @@ def save_orders_to_sheet(회원명, orders):
     for order in orders:
         row = [
             order.get("주문일자", now_kst().strftime("%Y-%m-%d")),
-            회원명,
+            clean_회원명,
             회원번호,
             회원_휴대폰번호,
             order.get("제품명", ""),

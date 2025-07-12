@@ -8,6 +8,7 @@ from routes.member.delete_member import delete_member_from_text
 from routes.member.find_member import find_member_from_text
 
 from routes.order.parse_and_save_order import save_order_from_text
+from routes.order.save_orders_to_sheet import save_orders_to_sheet  # ✅ 이 줄 추가
 
 
 router = Blueprint("intent_router", __name__)
@@ -29,7 +30,11 @@ def handle_member_intent():
 
         print("[요청 데이터]", data)
 
+        # 요청문 우선, 없으면 회원명을 텍스트로 대체
         text = data.get("요청문", "").strip()
+        if not text:
+            text = data.get("회원명", "").strip()
+
         if not text:
             return jsonify({"error": "요청문이 비어 있습니다."}), 400
 
@@ -46,8 +51,19 @@ def handle_member_intent():
             return delete_member_from_text(text)
         elif intent == "조회":
             return find_member_from_text(text)
+
+
+
         elif intent == "주문":
-            return save_order_from_text(text)
+            if "orders" in data:
+                clean_회원명 = data.get("회원명", "").replace("제품주문", "").replace("저장", "").strip()
+                return save_orders_to_sheet(clean_회원명, data["orders"])
+            else:
+                return save_order_from_text(text)
+
+
+
+
         else:
             return jsonify({
                 "message": "의도를 파악할 수 없습니다.",
@@ -58,6 +74,3 @@ def handle_member_intent():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
-
