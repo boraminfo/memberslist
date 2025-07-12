@@ -29,7 +29,8 @@ def parse_update_request(text):
 
     # ✅ 간단한 패턴 대응: "홍길동 수정 010-1234-7777"
     if name and re.search(r"수정|변경|바꿔", text):
-        phone_match = re.search(r"010[-\d]{7,9}", text)
+        phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", text)
+
         if phone_match:
             return name, {"휴대폰번호": phone_match.group()}
 
