@@ -1585,10 +1585,6 @@ def parse_and_save_order():
 
 
 
-# 변경내용 있음
-# 변경했어요
-
-
 
 
 
