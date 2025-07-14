@@ -16,20 +16,6 @@ async def get_sheet_values(sheet_name: str):
 
 
 def get_worksheet(sheet_name: str):
-<<<<<<< HEAD
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
-    import os
-
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-    client = gspread.authorize(creds)
-
-    spreadsheet = client.open(os.getenv("GOOGLE_SHEET_TITLE"))  # .env에서 읽도록
-    return spreadsheet.worksheet(sheet_name)
-
-
-=======
     import os
     import json
     import gspread
@@ -51,4 +37,3 @@ def get_worksheet(sheet_name: str):
 
 
 
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
