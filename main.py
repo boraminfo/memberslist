@@ -12,6 +12,7 @@ if os.getenv("RENDER") is None:
     if os.path.exists(dotenv_path):
         load_dotenv(dotenv_path)
 
+
 # ✅ FastAPI 인스턴스 생성
 app = FastAPI(
     title="회원관리 시스템 API",
@@ -27,6 +28,8 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
+
+
 
 
 

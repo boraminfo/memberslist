@@ -16,15 +16,24 @@ async def get_sheet_values(sheet_name: str):
 
 
 def get_worksheet(sheet_name: str):
-    import gspread
-    from oauth2client.service_account import ServiceAccountCredentials
     import os
+    import json
+    import gspread
+    from google.oauth2.service_account import Credentials
 
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+    # ✅ JSON 문자열 환경변수 사용
+    if os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"):
+        info = json.loads(os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"))
+        creds = Credentials.from_service_account_info(info)
+    else:
+        # ✅ 로컬 테스트용
+        from oauth2client.service_account import ServiceAccountCredentials
+        scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+        creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
     client = gspread.authorize(creds)
-
-    spreadsheet = client.open(os.getenv("GOOGLE_SHEET_TITLE"))  # .env에서 읽도록
+    spreadsheet = client.open(os.getenv("GOOGLE_SHEET_TITLE"))
     return spreadsheet.worksheet(sheet_name)
+
 
 
