@@ -1,78 +1,43 @@
-from flask import Flask
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from router_register import register_routers
 
 
 
-# ✅ 환경변수 로드 (로컬에서만)
+# ✅ 환경변수 로드 (로컬에서만 작동)
 if os.getenv("RENDER") is None:
-    dotenv_path = os.path.abspath('.env')
+    dotenv_path = os.path.abspath(".env")
     if os.path.exists(dotenv_path):
         load_dotenv(dotenv_path)
 
-# ✅ Flask 앱 생성
-app = Flask(__name__)
+# ✅ FastAPI 인스턴스 생성
+app = FastAPI(
+    title="회원관리 시스템 API",
+    description="회원, 주문, 메모, 상담일지 등을 관리하는 FastAPI 기반 백엔드",
+    version="1.0.0"
+)
+
+# ✅ CORS 설정 (프론트 연동용)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["https://members-list-boram.onrender.com"],  # ✅ 허용할 프론트 도메인
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
 
 
 
 
-# ✅ Blueprint 등록 함수로 분리
-def register_blueprints(app):
-    # 🧩 Member 관련
-    from routes.member.save_member import save_member_bp
-    from routes.member.update_member import update_member_bp
-    from routes.member.delete_member import delete_member_bp
-    from routes.member.find_member import find_member_bp
-    app.register_blueprint(save_member_bp)
-    app.register_blueprint(update_member_bp)
-    app.register_blueprint(delete_member_bp)
-    app.register_blueprint(find_member_bp)
+# ✅ 라우터 등록
+register_routers(app)
 
-    # 🧩 Order 관련
-    from routes.order.parse_and_save_order import parse_order_bp
-    from routes.order.save_order_from_json import save_order_json_bp
-    from routes.order.delete_order_request import delete_order_req_bp
-    from routes.order.delete_order_confirm import delete_order_conf_bp
-    app.register_blueprint(parse_order_bp)
-    app.register_blueprint(save_order_json_bp)
-    app.register_blueprint(delete_order_req_bp)
-    app.register_blueprint(delete_order_conf_bp)
-
-    # 🧩 Note 관련
-    from routes.note.add_counseling import add_counseling_bp
-    from routes.note.search_memo_by_tags import search_memo_bp
-    app.register_blueprint(add_counseling_bp)
-    app.register_blueprint(search_memo_bp)
-
-    # 🧩 Sheet 디버깅
-    from routes.sheet.debug_sheets import sheet_bp
-    app.register_blueprint(sheet_bp)
-
-
-    # ✅ Intent Router (자연어 기반 자동 분기)
-    from routes.intent_router import router as intent_router
-    app.register_blueprint(intent_router, url_prefix="/intent")
-
-
-# ✅ 홈 라우트
-@app.route("/")
-def home():
-    return "✅ Flask 서버가 실행 중입니다."
-
-
-
-
-# ✅ 앱 실행
-if __name__ == "__main__":
-    register_blueprints(app)
-    app.run(host="0.0.0.0", port=10000)
-
-
-
-
-
-
-
+# ✅ 루트 경로 (기본 상태 확인용)
+@app.get("/")
+def root():
+    return {"message": "FastAPI 서버가 실행 중입니다."}
 
 
 
