@@ -1,3 +1,4 @@
+from fastapi import APIRouter, Request  # ✅ Request 추가
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
