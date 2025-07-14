@@ -34,8 +34,7 @@ app.add_middleware(
 # ✅ 라우터 등록
 register_routers(app)
 
-# ✅ 라우터 등록
-register_routers(app)
+
 
 # ✅ 루트 경로 (기본 상태 확인용)
 @app.get("/")
@@ -43,4 +42,4 @@ def root():
     return {"message": "FastAPI 서버가 실행 중입니다."}
 
 
-
+# 잘 돼야
