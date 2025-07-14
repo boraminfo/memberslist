@@ -12,10 +12,6 @@ if os.getenv("RENDER") is None:
     if os.path.exists(dotenv_path):
         load_dotenv(dotenv_path)
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 # ✅ FastAPI 인스턴스 생성
 app = FastAPI(
     title="회원관리 시스템 API",
@@ -31,10 +27,6 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
-<<<<<<< HEAD
-=======
-
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 
 
 
@@ -42,12 +34,9 @@ app.add_middleware(
 # ✅ 라우터 등록
 register_routers(app)
 
-<<<<<<< HEAD
-=======
 # ✅ 라우터 등록
 register_routers(app)
 
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 # ✅ 루트 경로 (기본 상태 확인용)
 @app.get("/")
 def root():
