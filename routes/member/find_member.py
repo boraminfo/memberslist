@@ -1,16 +1,10 @@
-<<<<<<< HEAD
-# routes/member/find_member.py
-from fastapi import APIRouter, Request
-=======
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 from utils.sheets import get_worksheet
 from fastapi.responses import JSONResponse  # ⛳ 빠진 부분!
 
 router = APIRouter()
-<<<<<<< HEAD
 
 
 
@@ -26,19 +20,6 @@ async def find_member(request: Request):
 
         sheet = get_worksheet("DB")
         rows = sheet.get_all_records()  # 첫 줄은 헤더로 자동 처리됨
-=======
-
-class MemberRequest(BaseModel):
-    회원명: str
-
-@router.post("/find", tags=["회원"])
-async def find_member(request: MemberRequest):
-    name = request.회원명
-
-    try:
-        sheet = get_worksheet("DB")
-        rows = sheet.get_all_records()
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 
         for row in rows:
             if row.get("회원명") == name:

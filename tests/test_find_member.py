@@ -1,21 +1,13 @@
-<<<<<<< HEAD
 import pytest
 from fastapi import FastAPI
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import patch, MagicMock
 
-=======
-# tests/test_find_member.py
-
-from fastapi.testclient import TestClient
-from fastapi import FastAPI
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
 from routes.member.find_member import router
 
 app = FastAPI()
 app.include_router(router)
 
-<<<<<<< HEAD
 @pytest.mark.asyncio
 async def test_find_member_success():
     mock_rows = [
@@ -68,15 +60,3 @@ async def test_find_member_no_name():
 
     assert response.status_code == 400
     assert response.json()["error"] == "회원명을 입력해주세요."
-=======
-client = TestClient(app)
-
-def test_find_existing_member():
-    response = client.post("/find", json={"회원명": "이태수"})
-    assert response.status_code == 200
-    data = response.json()
-    assert data.get("회원명") == "이태수"
-    assert "정보" in data
-    assert isinstance(data["정보"], dict)
-
->>>>>>> 9c422ed4145d565717a661831de7bd9955f11c8c
