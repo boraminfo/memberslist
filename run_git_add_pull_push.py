@@ -12,7 +12,7 @@ def git_pull_push():
     env["GIT_SSH_COMMAND"] = f'ssh -F "{ssh_config_path.as_posix()}"'
 
     # git pull
-    subprocess.run(["git", "pull", "origin", "main"], env=env)
+    subprocess.run(["git", "pull", "--rebase", "origin", "main"], env=env)
 
     # 변경 감지
     result = subprocess.run(["git", "status", "--porcelain"], capture_output=True, text=True)
