@@ -5,7 +5,7 @@ users = [
     {"host": "github-boraminfo",    "identity": "id_ed25519_boraminfo"},
     {"host": "github-ehlhappyday",  "identity": "id_ed25519_ehlhappyday"},
     {"host": "github-sohee4463",    "identity": "id_ed25519_sohee4463"},
-    {"host": "github-boraminfo4",   "identity": "id_ed25519_boraminfo4"},
+    {"host": "github-boraminfo5",   "identity": "id_ed25519_boraminfo5"},
 ]
 
 def generate_ssh_config():
