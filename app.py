@@ -1481,6 +1481,36 @@ def parse_date(text):
             return re.sub(r"[./]", "-", match.group(1))
     return today.strftime("%Y-%m-%d")
 
+
+
+
+
+
+@app.route("/handle_text_request", methods=["POST"])
+def handle_text_request():
+    try:
+        data = request.get_json()
+        text = data.get("요청문", "")
+
+        if "제품주문" in text:
+            parsed = parse_order_text(text)
+            save_order_to_sheet(parsed)
+            return jsonify({"message": "✅ 제품주문이 자동으로 저장되었습니다."})
+
+        return jsonify({"message": "⚠️ 지원되지 않는 요청입니다."}), 400
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
 # ✅ 자연어 문장 파싱
 def parse_order_text(text):
     result = {}
@@ -1520,6 +1550,11 @@ def parse_order_text(text):
     result["주문일자"] = parse_date(text)
 
     return result
+
+
+
+
+
 
 # ✅ 주문 저장
 def save_order_to_sheet(parsed):
