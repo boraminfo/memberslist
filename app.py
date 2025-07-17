@@ -1497,12 +1497,17 @@ def handle_text_request():
             save_order_to_sheet(parsed)
             return jsonify({"message": "✅ 제품주문이 자동으로 저장되었습니다."})
 
+        elif any(kw in text for kw in ["상담일지", "기록", "활동일지"]):
+            # 상담일지 처리 로직 추가 가능
+            return jsonify({"message": "📝 상담일지 요청입니다. 별도 처리 로직을 구현해주세요."})
+
         return jsonify({"message": "⚠️ 지원되지 않는 요청입니다."}), 400
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
@@ -1595,6 +1600,11 @@ def save_order_to_sheet(parsed):
             "0"
         ]
         order_sheet.insert_row(row, 2, value_input_option="USER_ENTERED")
+
+
+
+
+
 
 # ✅ API 엔드포인트
 @app.route("/parse_and_save_order", methods=["POST"])
