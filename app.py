@@ -1529,6 +1529,12 @@ def parse_order_text(text):
     휴대폰_match = re.search(r"(\d{3}-\d{4}-\d{4})", text)
     배송처_match = re.search(r"(배송처)[^\w]*([^\n\"]+)", text)
 
+
+ # 🔽 추가된 부분: 회원명 추출 (없으면 주문자명 fallback)
+    회원명_match = re.search(r"(회원명)[^\w]*([가-힣]+)", text)
+    parsed["회원명"] = 회원명_match.group(2).strip() if 회원명_match else (주문자_match.group(2).strip() if 주문자_match else "")
+
+
     parsed["제품명"] = 제품명_match.group(1).strip() if 제품명_match else ""
     parsed["제품가격"] = 제품가격_match.group(1).strip() if 제품가격_match else ""
     parsed["PV"] = PV_match.group(1).strip() if PV_match else ""
@@ -1555,6 +1561,10 @@ def save_order_to_sheet(parsed):
     ss = client.open(sheet_title)
     db_sheet = ss.worksheet("DB")
     order_sheet = ss.worksheet("제품주문")
+
+    # ✅ 여기! 회원명 fallback 처리
+    회원명 = parsed.get("회원명") or parsed.get("주문자_고객명") or "미확인"
+
 
     # 회원 정보 조회
     members = db_sheet.get_all_records()
