@@ -1498,7 +1498,6 @@ def handle_text_request():
             return jsonify({"message": "✅ 제품주문이 자동으로 저장되었습니다."})
 
         elif any(kw in text for kw in ["상담일지", "기록", "활동일지"]):
-            # 상담일지 처리 로직 추가 가능
             return jsonify({"message": "📝 상담일지 요청입니다. 별도 처리 로직을 구현해주세요."})
 
         return jsonify({"message": "⚠️ 지원되지 않는 요청입니다."}), 400
@@ -1516,45 +1515,29 @@ def handle_text_request():
 
 
 
+
 # ✅ 자연어 문장 파싱
+import re
+
 def parse_order_text(text):
-    result = {}
+    parsed = {}
 
-    # 1. 회원명
-    match = re.match(r"(\S+)(?:님)?", text)
-    if match:
-        result["회원명"] = match.group(1)
+    제품명_match = re.search(r"제품명[^\w]*([^\n\"]+)", text)
+    제품가격_match = re.search(r"제품가격[^\d]*(\d[\d,]*)", text)
+    PV_match = re.search(r"PV[^\d]*(\d[\d,]*)", text)
+    주문자_match = re.search(r"(주문자|고객명)[^\w]*([가-힣]+)", text)
+    휴대폰_match = re.search(r"(\d{3}-\d{4}-\d{4})", text)
+    배송처_match = re.search(r"(배송처)[^\w]*([^\n\"]+)", text)
 
-    # 2. 제품명 + 수량
-    prod_match = re.search(r"([\w가-힣]+)[\s]*(\d+)\s*개", text)
-    if prod_match:
-        result["제품명"] = prod_match.group(1)
-        result["수량"] = int(prod_match.group(2))
-    else:
-        result["제품명"] = "제품"
-        result["수량"] = 1
+    parsed["제품명"] = 제품명_match.group(1).strip() if 제품명_match else ""
+    parsed["제품가격"] = 제품가격_match.group(1).strip() if 제품가격_match else ""
+    parsed["PV"] = PV_match.group(1).strip() if PV_match else ""
+    parsed["주문자_고객명"] = 주문자_match.group(2).strip() if 주문자_match else ""
+    parsed["주문자_휴대폰번호"] = 휴대폰_match.group(1).strip() if 휴대폰_match else ""
+    parsed["배송처"] = 배송처_match.group(2).strip() if 배송처_match else ""
 
-    # 3. 결제방법
-    if "카드" in text:
-        result["결재방법"] = "카드"
-    elif "현금" in text:
-        result["결재방법"] = "현금"
-    elif "계좌" in text:
-        result["결재방법"] = "계좌이체"
-    else:
-        result["결재방법"] = "카드"
+    return parsed
 
-    # 4. 주소 or 배송지
-    address_match = re.search(r"(?:주소|배송지)[:：]\s*(.+?)(\s|$)", text)
-    if address_match:
-        result["배송처"] = address_match.group(1).strip()
-    else:
-        result["배송처"] = ""
-
-    # 5. 주문일자
-    result["주문일자"] = parse_date(text)
-
-    return result
 
 
 
@@ -1586,19 +1569,20 @@ def save_order_to_sheet(parsed):
 
     for _ in range(parsed.get("수량", 1)):
         row = [
-            parsed.get("주문일자"),
+            parsed.get("주문일자", datetime.now().strftime("%Y-%m-%d")),
             회원명,
             회원번호,
             회원_휴대폰,
             parsed.get("제품명"),
-            "0",  # 제품가격
-            "0",  # PV
-            parsed.get("결재방법"),
+            parsed.get("제품가격", "0"),
+            parsed.get("PV", "0"),
+            parsed.get("결재방법", "미지정"),
             회원명,
             회원_휴대폰,
             parsed.get("배송처"),
             "0"
         ]
+
         order_sheet.insert_row(row, 2, value_input_option="USER_ENTERED")
 
 
