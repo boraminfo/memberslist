@@ -1768,7 +1768,7 @@ def delete_order_confirm():
 
 
 
-
+# 모두 새로 정리
 
 # 새로 추가
 
