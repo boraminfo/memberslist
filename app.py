@@ -1347,6 +1347,14 @@ def handle_order_save(data):
 
     #sheet.insert_row(row, index=2)
 
+def handle_product_order(text, member_name):
+    try:
+        parsed = parse_order_text(text)  # 자연어 문장 → 주문 dict 변환
+        parsed["회원명"] = member_name
+        handle_order_save(parsed)  # 실제 시트 저장
+        return jsonify({"message": f"{member_name}님의 제품주문 저장이 완료되었습니다."})
+    except Exception as e:
+        return jsonify({"error": f"제품주문 처리 중 오류 발생: {str(e)}"}), 500
 
 
 
