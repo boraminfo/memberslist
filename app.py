@@ -938,22 +938,19 @@ def parse_request_and_update_multi(data: str, member: dict) -> dict:
         value_match = re.search(rf"{keyword}\s*(?:를|은|는|이|가|:|：)?\s*(.+)", value_block)
         if value_match:
             value = value_match.group(1).strip()
+
+            # ✅ 불필요한 명령어 제거
+            value = re.sub(r'(수정해줘|변경해줘|바꿔줘|해주세요|해주세요\.?|요청합니다\.?)$', '', value).strip()
+
             field = field_map[keyword]
+            
+            
             member[field] = value
             member[f"{field}_기록"] = f"(기록됨: {value})"
 
 
 
-
-
-
-
-
-
-
-
     return member
-
 
 
 
