@@ -1102,7 +1102,8 @@ def save_to_sheet(sheet_name, member_name, content):
 
 
 
-
+def clean_request_text(text):
+    return ' '.join(text.replace("회원", "").split())
 
 
 
