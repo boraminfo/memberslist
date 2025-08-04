@@ -14,11 +14,13 @@ from datetime import datetime
 from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
-from utils.sheets import get_order_sheet, get_member_info
-
 import requests
 import time
-from utils.sheets import get_order_sheet, get_member_info
+
+
+
+
+
 
 def some_function():
     print("작업 시작")
@@ -300,15 +302,19 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
 
 
 
+
+
+
+import re
+
 def clean_value_expression(text: str) -> str:
+    # 문장 끝에 붙은 조사나 표현만 제거
     particles = ['로', '으로', '은', '는', '을', '를', '수정해 줘']
     for p in particles:
-        text = re.sub(rf'(\S+){p}(\W)', r'\1\2', text)
-        text = re.sub(rf'(\S+)\s+{p}(\W)', r'\1\2', text)
-    return text
-
-
-
+        # 끝에 붙은 조사 제거: "서울로", "회원번호는", "주소를" 등
+        pattern = rf'({p})\s*$'
+        text = re.sub(pattern, '', text)
+    return text.strip()
 
 
 
@@ -408,6 +414,9 @@ def update_member():
 
 
 
+
+
+
 # ========================================================================================
 # ================================
 # 예시 데이터베이스 (실제 환경에서는 DB 연동)
@@ -502,6 +511,181 @@ def parse_request_and_update_multi(data: str, member: dict) -> dict:
 
 
 
+import re
+
+# ✅ 꼬리 명령어 정제 함수 추가
+def clean_tail_command(text):
+    tail_phrases = [
+        "로 정확히 수정해줘", "으로 정확히 수정해줘",
+        "로 바꿔", "으로 바꿔", "로 변경", "으로 변경", 
+        "로 수정", "으로 수정", 
+        "정확히 수정해줘", "수정해줘", "변경해줘", 
+        "바꿔줘", "변경해", "바꿔", "수정", "변경", 
+        "저장해줘", "기록", "입력", "해줘", "남겨", "해주세요"
+    ]
+
+
+
+
+
+
+
+    for phrase in tail_phrases:
+        # "로", "으로"가 꼬리 명령어 직전일 경우에만 함께 제거
+
+        pattern = rf"(?:\s*(?:으로|로))?\s*{re.escape(phrase)}\s*[^\w가-힣]*$"
+
+
+        text = re.sub(pattern, "", text)
+
+    return text.strip()
+
+
+
+
+
+def clean_affiliation(text):
+    # 예외 처리: '이은혜', '이태수' 같은 고유명사는 보호
+    exceptions = ['이은혜', '이태수']
+    for name in exceptions:
+        if name in text:
+            return text.replace(name + "우측", name + " 우측")
+    return text
+
+
+
+def clean_name_field(value):
+    # 고유명사 예외 목록 (필요 시 확장 가능)
+    proper_nouns = ['이태수', '이은혜', '이판사', '임채영']
+    
+    # 정확히 일치하는 고유명사는 그대로 반환
+    if value in proper_nouns:
+        return value
+
+    # 조사 제거 규칙 예시
+    value = value.strip()
+    if value.startswith("이") and len(value) > 2:
+        # '이'를 조사로 간주하는 경우 잘못된 제거 방지
+        return value
+    return value
+
+
+
+
+def extract_value(raw_text):
+    # 명령어 후미 제거
+    cleaned = raw_text.replace("로 정확히 수정해줘", "") \
+                      .replace("정확히 수정해줘", "") \
+                      .replace("수정해줘", "") \
+                      .strip()
+    return cleaned
+
+
+
+
+
+def parse_field_value(field, raw_text):
+    if field in ["주소", "메모"]:
+        return raw_text.strip()
+    else:
+        return extract_value(raw_text)
+
+
+
+
+
+
+
+
+
+def extract_phone(text):
+    match = re.search(r'01[016789]-?\d{3,4}-?\d{4}', text)
+    if match:
+        number = match.group()
+        number = re.sub(r'[^0-9]', '', number)
+        return f"{number[:3]}-{number[3:7]}-{number[7:]}"
+    return None
+
+
+
+
+
+
+
+def extract_member_number(text):
+    match = re.search(r'\b\d{7,8}\b', text)
+    if match:
+        return match.group()
+    return None
+
+
+
+
+
+
+
+def extract_password(text):
+    # 비밀번호 패턴: 영문/숫자/특수문자 포함, 6~20자
+    match = re.search(r"비밀번호(?:를|는)?\s*([^\s\"']{6,20})", text)
+    if match:
+        return match.group(1)
+    return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def extract_referrer(text):
+    # "소개한분은 홍길동으로", "추천인은 박철수입니다" 등에서 이름 추출
+    match = re.search(r"(소개한분|소개자|추천인)[은는을이]?\s*([가-힣]{2,10})", text)
+    if match:
+        이름 = match.group(2)
+        
+        # "로"로 끝나는 경우에만 삭제 ("로열", "로미오" 등은 유지)
+        if 이름.endswith("로"):
+            이름 = 이름[:-1]
+
+        return 이름
+    return None
+
+
+
+
+
+
+
+
+def infer_field_from_value(value: str) -> str | None:
+    value = value.strip()
+
+    if re.match(r"010[-]?\d{3,4}[-]?\d{4}", value):
+        return "휴대폰번호"
+    elif re.fullmatch(r"\d{4,8}", value):
+        return "회원번호"
+    elif re.search(r"(좌측|우측|라인|왼쪽|오른쪽)", value):
+        return "계보도"
+
+    elif re.fullmatch(r"[a-zA-Z0-9@!#%^&*]{6,20}", value):
+        return "비밀번호"  # ✅ 비밀번호 후보로 인식
+    
+
+
+    return None
+
+
+
+
+
 
 
 
@@ -512,24 +696,6 @@ def parse_request_and_update_multi(data: str, member: dict) -> dict:
 # ✅ 회원 수정 API
 def parse_request_and_update(data: str, member: dict) -> tuple:
     수정된필드 = {}
-
-
-
-    # ✅ "계보도 다음 문구" 무조건 필드로 처리
-    계보도_패턴 = re.search(r"계보도[를은는]?\s*([가-힣]{2,}(?:\s?[가-힣]{1,})?)\s*(좌측|우측|라인|왼쪽|오른쪽)?", data)
-
-    if 계보도_패턴:
-        이름 = 계보도_패턴.group(1)
-        방향 = 계보도_패턴.group(2)
-        if 방향:
-            value = f"{이름} {방향}"
-        else:
-            value = 이름  # 방향이 없을 경우, 이름만 기록
-        member["계보도"] = value
-        member["계보도_기록"] = f"(기록됨: {value})"
-        수정된필드["계보도"] = value
-
-    계보도_이름 = 계보도_패턴.group(1) if 계보도_패턴 else None
 
 
 
@@ -561,8 +727,70 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
             # ✅ 공통 꼬리 명령어 제거 대상 필드
             if 키 in {"주소", "메모", "휴대폰번호", "회원번호", "비밀번호", "가입일자", "생년월일",
-                    "통신사", "친밀도", "근무처", "소개한분", "코드"}:
-                값 = re.sub(r"(으로)?\s*(수정해줘|저장해줘|변경해줘|바꿔줘|해주세요|해주세요|수정|저장|기록|입력|해줘|남겨)[^\w가-힣]*$", "", 값).strip()
+                    "통신사", "친밀도", "근무처", "계보도","소개한분", "코드"}:
+                값 = clean_tail_command(값)
+
+                값 = 값.strip().rstrip("'\"“”‘’.,)")
+
+
+
+            # 세부 필드별 추가 정제
+            if 키 == "휴대폰번호":
+                값 = extract_phone(값)
+
+
+
+            elif 키 == "회원번호":
+                값 = extract_member_number(값) or 값
+
+
+
+            elif 키 == "비밀번호":
+                값 = extract_password(값) or 값
+
+
+
+            elif 키 == "생년월일":
+                if "지워" in block:
+                    값 = ""
+                else:
+                    match_date = re.search(r"\d{4}-\d{2}-\d{2}", 값)
+                    값 = match_date.group() if match_date else ""
+
+
+
+            elif 키 == "친밀도":
+                match = re.search(r"(상|중|하)", 값)
+                값 = match.group(1) if match else ""
+
+
+
+
+
+
+            elif 키 == "계보도":
+                # ✅ 중간 조사 제거
+                값 = re.sub(r"([가-힣]{2,4})(을|를|이|가|은|는)", r"\1", 값)
+
+                # ✅ 이름과 방향 추출
+                name_dir_match = re.search(r"([가-힣]{2,4})\s*(좌측|우측|라인|왼쪽|오른쪽)", 값)
+                if name_dir_match:
+                    이름 = name_dir_match.group(1)
+                    방향 = name_dir_match.group(2)
+                    값 = f"{이름}{방향}"
+                else:
+                    # 혹시 공백 없이 적힌 경우도 그대로 인정
+                    값 = 값.replace(" ", "")
+
+
+
+
+
+
+ 
+            elif 키 == "소개한분":
+                값 = extract_referrer(block) or 값  # ✅ 여기에 넣기
+
 
 
 
@@ -585,10 +813,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         if len(tokens) >= 2:
             name_candidate = tokens[0]
             value_candidate = ' '.join(tokens[1:]).replace("수정", "").strip()
+            value_candidate = clean_tail_command(value_candidate)
 
-
-            # ✅ 꼬리 명령어 제거
-            value_candidate = re.sub(r"(수정해줘|저장해줘|변경해줘|바꿔줘|해주세요|해주세요|수정|저장|기록|입력|해줘|남겨)[^\w가-힣]*$", "", value_candidate).strip()
 
 
 
@@ -606,6 +832,8 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 member[f"{inferred_field}_기록"] = f"(기록됨: {value})"
 
     return member, 수정된필드
+
+
    
 
 
@@ -613,35 +841,6 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-def infer_field_from_value(value: str) -> str | None:
-    value = value.strip()
-
-    if re.match(r"010[-]?\d{3,4}[-]?\d{4}", value):
-        return "휴대폰번호"
-    elif re.fullmatch(r"\d{4,8}", value):
-        return "회원번호"
-    elif re.search(r"(좌측|우측|라인|왼쪽|오른쪽)", value):
-        return "계보도"
-
-    elif re.fullmatch(r"[a-zA-Z0-9@!#%^&*]{6,20}", value):
-        return "비밀번호"  # ✅ 비밀번호 후보로 인식
-    
-    return None
 
 
 
@@ -685,12 +884,14 @@ def infer_field_from_value(value: str) -> str | None:
 # ✅ 회원 등록 명령 파싱 함수
 # ✅ 통합 파싱 함수 (개선된 정규식 + 안정성 보강)
 def parse_registration(text):
+    import re
+
     text = text.replace("\n", " ").replace("\r", " ").replace("\xa0", " ").strip()
     print(f"[🔍DEBUG] 전처리된 입력 text: '{text}'")
 
     name = number = phone = lineage = ""
 
-    # ✅ 휴대폰번호 추출 (01012345678, 010-1234-5678 등 허용)
+    # ✅ 휴대폰번호 추출
     phone_match = re.search(r"010[-]?\d{4}[-]?\d{4}", text)
     if phone_match:
         phone = phone_match.group(0)
@@ -705,65 +906,32 @@ def parse_registration(text):
     if match:
         name = match.group(1).strip()
         number = re.sub(r"[^\d]", "", match.group(2)).strip()
-
-
-
-
         print(f"[✅DEBUG] 회원번호 형식 매칭 → name: '{name}', number: '{number}'")
     else:
-        # ✅ 이름 + 번호 + '회원등록' 포함 시 추출
         match = re.search(r"([가-힣]{2,10})\s+(\d{6,})", text)
         if match and "회원등록" in text:
             name = match.group(1).strip()
             number = re.sub(r"[^\d]", "", match.group(2)).strip()
-
-
-
             print(f"[✅DEBUG] 번호 포함 등록 형식 → name: '{name}', number: '{number}'")
         else:
-            # ✅ 이름만 + '회원등록'
             match = re.search(r"^([가-힣]{2,10})\s*회원등록$", text)
             if match:
                 name = match.group(1).strip()
                 print(f"[✅DEBUG] 이름만 포함된 등록 형식 → name: '{name}'")
 
-    # ✅ fallback 이름
+    # ✅ fallback
     if not name and korean_words:
         name = korean_words[0]
         print(f"[ℹ️DEBUG] fallback 적용 → name: {name}")
-
-    # ✅ fallback 회원번호
     if not number:
         print("[ℹ️DEBUG] 회원번호 없이 등록됨")
         number = ""
 
-
-
-
-
-    # ✅ 계보도 추정 - 정규식 기반 우선 추출
-    lineage_match = re.search(r"계보도.*?'(.+?)'", text)
-    if lineage_match:
-        lineage = lineage_match.group(1).strip()
-        print(f"[🎯DEBUG] 정규식으로 계보도 추출됨: {lineage}")
-    else:
-
-        # ✅ 계보도 추정
-        위치어 = ["좌측", "우측", "라인", "왼쪽", "오른쪽"]
-        불필요_계보도 = ["회원등록", "회원", "등록"]
-        필터링된 = [w for w in korean_words if w not in 불필요_계보도]
-
-
-    if name:
-        필터링된 = [w for w in 필터링된 if w not in name]
-
-    if len(필터링된) >= 2 and 필터링된[-1] in 위치어:
-        lineage = f"{필터링된[-2]} {필터링된[-1]}"
-    elif 필터링된:
-        lineage = 필터링된[-1]
+    # ❌ 계보도 추정 제거됨
 
     print(f"[RESULT] 이름={name}, 번호={number}, 휴대폰번호={phone}, 계보도={lineage}")
     return name or None, number or None, phone or None, lineage or None
+
 
 
 
@@ -959,28 +1127,6 @@ def delete_member():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def extract_nouns(text):
     return re.findall(r'[가-힣]{2,}', text)
 
@@ -1102,10 +1248,10 @@ def save_to_sheet(sheet_name, member_name, content):
 
 
 
+
+
 def clean_request_text(text):
     return ' '.join(text.replace("회원", "").split())
-
-
 
 
 @app.route('/add_counseling', methods=['POST'])
@@ -1126,14 +1272,46 @@ def add_counseling():
         sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력", "회원메모", "제품주문", "회원주소"]
         action_keywords = ["저장", "기록", "입력"]
 
+
+
+        if "전체메모" in text and "검색" in text:
+            return search_all_memo_by_text_from_natural()
+
+
+
+
+        # ✅ 🔽 검색 요청 분기 추가
+        if "개인메모" in text and "검색" in text:
+            return search_memo_by_text_from_natural(text)
+
+
+
+        if "상담일지" in text and "검색" in text:
+            return search_counseling_by_text_from_natural(text)
+        
+
+
+        if "활동일지" in text and "검색" in text:
+            return search_activity_by_text_from_natural(text)
+
+
+
+
+
         # ✅ 유효성 검사
         if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
             return jsonify({
                 "message": "저장하려면 '상담일지', '개인메모', '활동일지', '회원메모', '제품주문', '회원주소' 중 하나와 '저장', '기록', '입력' 같은 동작어를 포함해 주세요."
             })
 
+
+
         # ✅ 회원명 추출 (ex: "이태수 상담일지 저장...")
-        match = re.search(r"([가-힣]{2,3})\s*(상담일지|개인메모|활동일지|직접입력|회원메모|제품주문|회원주소)", text)
+        
+        match = re.search(r"([가-힣]{2,4})\s*(상담일지|개인메모|활동일지|직접입력|회원메모|제품주문|회원주소)", text)
+
+
+
         if not match:
             return jsonify({"message": "회원명을 인식할 수 없습니다."})
         member_name = match.group(1)
@@ -1142,10 +1320,7 @@ def add_counseling():
         matched_sheet = next((kw for kw in sheet_keywords if kw in text), None)
         if not matched_sheet:
             return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
-
-        # ✅ 제품주문 처리 분기
-        if matched_sheet == "제품주문":
-            return handle_product_order(text, member_name)
+        
 
         # ✅ 불필요한 키워드 제거
         for kw in [member_name] + sheet_keywords + action_keywords:
@@ -1153,8 +1328,28 @@ def add_counseling():
         text = text.strip()
         text = re.sub(r'^[:：]\s*', '', text)
 
+
+
+        # ✅ 제품주문 처리 분기
+        if matched_sheet == "제품주문":
+            return handle_product_order(text, member_name)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
         # ✅ DB 시트 필드 업데이트 함수
-        def update_member_field(field_name, value):
+        def update_member_field(field_name, value, member_name):
             sheet = get_member_sheet()
             db = sheet.get_all_records()
             headers = [h.strip().lower() for h in sheet.row_values(1)]
@@ -1173,12 +1368,20 @@ def add_counseling():
             else:
                 return jsonify({"message": f"'{field_name}' 필드가 시트에 존재하지 않습니다."})
 
-        # ✅ 회원메모 / 회원주소 처리
+
+
+
         if matched_sheet == "회원메모":
-            return update_member_field("메모", text)
+            member_name = extract_member_name(text)
+            return update_member_field("메모", text, member_name)
+
 
         if matched_sheet == "회원주소":
             return update_member_field("주소", text)
+
+
+
+
 
         # ✅ 상담일지, 개인메모, 활동일지 시트 저장
         if matched_sheet in ["상담일지", "개인메모", "활동일지"]:
@@ -1189,6 +1392,9 @@ def add_counseling():
 
         return jsonify({"message": "처리할 수 없는 시트입니다."})
 
+
+
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -1200,6 +1406,10 @@ def add_counseling():
 
 
     
+
+
+
+
 
             
     
@@ -1209,74 +1419,414 @@ def add_counseling():
 
 
 
-    
 
 
-
-
-
-
-
-
-
-
-# 개인 메모 시트에서 태그 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
-
-@app.route("/search_memo_by_tags", methods=["POST"])
-def search_memo_by_tags():
+# ===========================================================================
+# 상담일지 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
+@app.route("/search_counseling_by_text_from_natural", methods=["POST"])
+def search_counseling_by_text_from_natural():
     try:
         data = request.get_json()
-        input_tags = data.get("tags", [])
-        limit = int(data.get("limit", 10))
-        sort_by = data.get("sort_by", "date").lower()
-        min_match = int(data.get("min_match", 1))
+        keywords = data.get("keywords", [])
+        limit = int(data.get("limit", 20))
+        sort_order = data.get("sort", "desc")
+        match_mode = data.get("match_mode", "any")
 
-        if not input_tags:
-            return jsonify({"error": "태그 리스트가 비어 있습니다."}), 400
-        if sort_by not in ["date", "tag"]:
-            return jsonify({"error": "sort_by는 'date' 또는 'tag'만 가능합니다."}), 400
+        print("▶ 상담일지 검색 조건:", keywords, match_mode)
 
-        sheet = get_mymemo_sheet()
-        values = sheet.get_all_values()[1:]  # 헤더 제외
+        if not keywords or not isinstance(keywords, list):
+            return jsonify({"error": "keywords는 비어 있지 않은 리스트여야 합니다."}), 400
+
+        sheet = get_counseling_sheet()
+        values = sheet.get_all_values()[1:]
         results = []
 
         for row in values:
             if len(row) < 3:
                 continue
-            member, date_str, content = row[0], row[1], row[2]
+            date_str, member, content = row[0], row[1], row[2]
+
+            combined_text = f"{member} {content}"
+            if match_mode == "all" and not all(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
+            if match_mode == "any" and not any(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
 
             try:
                 parsed_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
             except ValueError:
-                continue  # 날짜 형식 오류시 건너뜀
+                continue
 
-            memo_tags = extract_nouns(content)
-            similarity = len(set(input_tags) & set(memo_tags))
-            if similarity >= min_match:
-                results.append({
-                    "회원명": member,
-                    "날짜": date_str,
-                    "내용": content,
-                    "일치_태그수": similarity,
-                    "날짜_obj": parsed_date
-                })
+            results.append({
+                "날짜": date_str,
+                "회원명": member,
+                "내용": content,
+                "날짜_obj": parsed_date
+            })
 
-        # 정렬 조건 적용
-        if sort_by == "tag":
-            results.sort(key=lambda x: (x["일치_태그수"], x["날짜_obj"]), reverse=True)
-        else:  # 기본: 날짜순
-            results.sort(key=lambda x: (x["날짜_obj"], x["일치_태그수"]), reverse=True)
+        results.sort(key=lambda x: x["날짜_obj"], reverse=(sort_order == "desc"))
 
-        # 날짜 객체 제거
         for r in results:
             del r["날짜_obj"]
 
-        return jsonify({"검색결과": results[:limit]}), 200
+        return jsonify({
+            "검색조건": {
+                "키워드": keywords,
+                "매칭방식": match_mode,
+                "정렬": sort_order
+            },
+            "검색결과": results[:limit]
+        }), 200
 
     except Exception as e:
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+# ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
+def run_counseling_search_from_natural_text(text):
+    ignore_words = ["상담일지", "검색", "에서", "해줘", "해", "줘"]
+    words = [kw for kw in text.split() if kw not in ignore_words]
+
+    if not words:
+        return jsonify({"error": "검색어가 없습니다."}), 400
+
+    match_mode = "all" if "동시" in words else "any"
+    keywords = [kw for kw in words if kw != "동시"]
+
+    with app.test_request_context(json={
+        "keywords": keywords,
+        "limit": 20,
+        "sort": "desc",
+        "match_mode": match_mode
+    }):
+        return search_counseling_by_text_from_natural()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ===========================================================================
+# 개인 메모 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
+@app.route("/search_memo_by_text", methods=["POST"])
+def search_memo_by_text():
+    try:
+        data = request.get_json()
+
+        all_keywords = data.get("keywords", [])
+        limit = int(data.get("limit", 20))
+        sort_order = data.get("sort", "desc")
+        match_mode = data.get("match_mode", "any")
+
+        # 🔹 검색 조건 로깅
+        print("===== 📌 검색 조건 =====")
+        print(f"검색 키워드: {all_keywords if all_keywords else '없음'}")
+        print(f"매칭 방식: {match_mode}")
+        print("========================")
+
+        sheet = get_mymemo_sheet()
+        values = sheet.get_all_values()[1:]
+        results = []
+
+        for row in values:
+            if len(row) < 3:
+                continue
+
+            date_str, member, content = row[0], row[1], row[2]
+            combined_text = f"{member} {content}"
+
+            if not match_condition(combined_text, all_keywords, match_mode):
+                continue
+
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+
+            results.append({
+                "날짜": date_str,
+                "회원명": member,
+                "내용": content,
+                "날짜_obj": parsed_date
+            })
+
+        results.sort(key=lambda x: x["날짜_obj"], reverse=(sort_order == "desc"))
+        for r in results:
+            del r["날짜_obj"]
+
+        response = {
+            "검색조건": {
+                "검색어": all_keywords,
+                "매칭방식": match_mode,
+                "정렬": sort_order,
+                "결과_최대개수": limit
+            },
+            "검색결과": results[:limit]
+        }
+
+        return jsonify(response), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
+def run_memo_search_from_natural_text(text):
+    ignore_words = ["개인메모", "검색", "에서", "해줘", "해", "줘"]
+    words = [kw for kw in text.split() if kw not in ignore_words]
+
+    if not words:
+        return jsonify({"error": "검색어가 없습니다."}), 400
+
+    match_mode = "all" if "동시" in words else "any"
+    keywords = [kw for kw in words if kw != "동시"]
+
+    with app.test_request_context(json={
+        "keywords": keywords,
+        "limit": 20,
+        "sort": "desc",
+        "match_mode": match_mode
+    }):
+        return search_memo_by_text()
+
+
+# ✅ 키워드 포함 여부 판별 함수
+def match_condition(text, keywords, mode):
+    if not keywords:
+        return True
+    text = text.lower()
+    keywords = [kw.lower() for kw in keywords]
+    if mode == "all":
+        return all(kw in text for kw in keywords)
+    return any(kw in text for kw in keywords)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ===========================================================================
+# 활동일지 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
+@app.route("/search_activity_by_text_from_natural", methods=["POST"])
+def search_activity_by_text_from_natural():
+    try:
+        data = request.get_json()
+        keywords = data.get("keywords", [])
+        limit = int(data.get("limit", 20))
+        sort_order = data.get("sort", "desc")
+        match_mode = data.get("match_mode", "any")
+
+        print("▶ 활동일지 검색 조건:", keywords, match_mode)
+
+        if not keywords or not isinstance(keywords, list):
+            return jsonify({"error": "keywords는 비어 있지 않은 리스트여야 합니다."}), 400
+
+        sheet = get_dailyrecord_sheet()
+        values = sheet.get_all_values()[1:]
+        results = []
+
+        for row in values:
+            if len(row) < 3:
+                continue
+            date_str, member, content = row[0], row[1], row[2]
+
+            combined_text = f"{member} {content}"
+            if match_mode == "all" and not all(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
+            if match_mode == "any" and not any(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
+
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+
+            results.append({
+                "날짜": date_str,
+                "회원명": member,
+                "내용": content,
+                "날짜_obj": parsed_date
+            })
+
+        results.sort(key=lambda x: x["날짜_obj"], reverse=(sort_order == "desc"))
+
+        for r in results:
+            del r["날짜_obj"]
+
+        return jsonify({
+            "검색조건": {
+                "키워드": keywords,
+                "매칭방식": match_mode,
+                "정렬": sort_order
+            },
+            "검색결과": results[:limit]
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
+def run_activity_search_from_natural_text(text):
+    ignore_words = ["활동일지", "검색", "에서", "해줘", "해", "줘"]
+    words = [kw for kw in text.split() if kw not in ignore_words]
+
+    if not words:
+        return jsonify({"error": "검색어가 없습니다."}), 400
+
+    match_mode = "all" if "동시" in words else "any"
+    keywords = [kw for kw in words if kw != "동시"]
+
+    with app.test_request_context(json={
+        "keywords": keywords,
+        "limit": 20,
+        "sort": "desc",
+        "match_mode": match_mode
+    }):
+        return search_activity_by_text_from_natural()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ===========================================================================
+# 전체메모 에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
+@app.route("/search_all_memo_by_text_from_natural", methods=["POST"])
+def search_all_memo_by_text_from_natural():
+    try:
+        data = request.get_json(silent=True)
+        if data is None:
+            return jsonify({"error": "JSON 데이터가 유효하지 않거나 없습니다."}), 400
+
+        raw_text = data.get("text", "")
+        if not raw_text.strip() and "keywords" in data:
+            raw_text = " ".join(data["keywords"])
+
+        if not raw_text.strip():
+            return jsonify({"error": "검색어가 없습니다."}), 400
+
+        return run_all_memo_search_from_natural_text(raw_text)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ 자연어 기반 전체메모 검색 함수 (분리된 내부 처리용)
+def run_all_memo_search_from_natural_text(text):
+    ignore_words = ["전체메모", "검색", "에서", "해줘", "해", "줘", "동시"]
+    words = [kw for kw in text.split() if kw not in ignore_words]
+    has_dongsi = "동시" in text.split()
+    match_mode = "all" if has_dongsi else "any"
+    keywords = words
+
+    if not keywords:
+        return jsonify({"error": "검색어가 없습니다."}), 400
+
+    payload = {
+        "keywords": keywords,
+        "limit": 20,
+        "sort": "desc",
+        "match_mode": match_mode
+    }
+
+    with app.test_client() as client:
+        개인메모 = client.post("/search_memo_by_text", json=payload)
+        활동일지 = client.post("/search_activity_by_text_from_natural", json=payload)
+        상담일지 = client.post("/search_counseling_by_text_from_natural", json=payload)
+
+    def extract_results(response):
+        try:
+            json_data = response.get_json()
+            if json_data and "검색결과" in json_data:
+                return json_data["검색결과"]
+        except Exception:
+            pass
+        return []
+
+    result_lines = []
+
+    for label, res in [("개인메모", 개인메모), ("활동일지", 활동일지), ("상담일지", 상담일지)]:
+        result_lines.append(f"=== {label} ===")
+        for r in extract_results(res):
+            result_lines.append(f"{r['날짜']} {r['회원명']} {r['내용']}")
+        result_lines.append("")
+
+    response_text = "\n".join(result_lines)
+    return response_text, 200, {"Content-Type": "text/plain; charset=utf-8"}
+
+
+    
+
+
+    
+
+
+
+
 
 
 
@@ -1348,6 +1898,7 @@ def handle_order_save(data):
 
     #sheet.insert_row(row, index=2)
 
+
 def handle_product_order(text, member_name):
     try:
         parsed = parse_order_text(text)  # 자연어 문장 → 주문 dict 변환
@@ -1356,8 +1907,6 @@ def handle_product_order(text, member_name):
         return jsonify({"message": f"{member_name}님의 제품주문 저장이 완료되었습니다."})
     except Exception as e:
         return jsonify({"error": f"제품주문 처리 중 오류 발생: {str(e)}"}), 500
-
-
 
 
 
@@ -1790,13 +2339,13 @@ def delete_order_confirm():
 
 
 
-# 모두 새로 정리
-
-# 새로 추가
 
 
-
-
+@app.route("/debug_sheet", methods=["GET"])
+def debug_sheet():
+    sheet = get_mymemo_sheet()
+    values = sheet.get_all_values()
+    return jsonify(values), 200
 
 
 
