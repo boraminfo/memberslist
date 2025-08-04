@@ -714,6 +714,31 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             positions.append((match.start(), 키))
     positions.sort()
 
+
+
+
+
+    # ✅ 여기에 전처리 블록 추가
+    if not positions:
+        # 예: "홍길동 수정 휴대폰번호 010-2759-8000 회원번호 40005000"
+        tokens = data.strip().split()
+        for i in range(len(tokens) - 1):
+            키워드 = tokens[i]
+            값 = tokens[i + 1]
+            if 키워드 in 필드맵:
+                필드 = 필드맵[키워드]
+                member[필드] = 값
+                member[f"{필드}_기록"] = f"(기록됨: {값})"
+                수정된필드[필드] = 값
+
+
+
+
+
+
+
+
+
     # ✅ 각 필드 블록 파싱
     for idx, (start, 키) in enumerate(positions):
         끝 = positions[idx + 1][0] if idx + 1 < len(positions) else len(data)
@@ -810,13 +835,12 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     if not positions:
         # 키워드가 없을 경우 추론
         tokens = data.strip().split()
+        
+        # 기존 단일 추론 로직 (유지)
         if len(tokens) >= 2:
             name_candidate = tokens[0]
             value_candidate = ' '.join(tokens[1:]).replace("수정", "").strip()
             value_candidate = clean_tail_command(value_candidate)
-
-
-
 
             inferred_field = infer_field_from_value(value_candidate)
             if inferred_field:
@@ -831,7 +855,24 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 member[inferred_field] = value
                 member[f"{inferred_field}_기록"] = f"(기록됨: {value})"
 
+        # ✅ 추가: 여러 값이 있을 경우 각각 형식 기반 추론
+        for token in tokens:
+            # 휴대폰번호 형태
+            if re.match(r"010[-]?\d{3,4}[-]?\d{4}", token):
+                phone = extract_phone(token)
+                member["휴대폰번호"] = phone
+                member["휴대폰번호_기록"] = f"(기록됨: {phone})"
+                수정된필드["휴대폰번호"] = phone
+
+            # 숫자 6~8자리: 회원번호 추정
+            elif re.match(r"^\d{6,8}$", token):
+                member_no = extract_member_number(token) or token
+                member["회원번호"] = member_no
+                member["회원번호_기록"] = f"(기록됨: {member_no})"
+                수정된필드["회원번호"] = member_no
+
     return member, 수정된필드
+
 
 
    
