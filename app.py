@@ -760,18 +760,27 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
             # 세부 필드별 추가 정제
-            if 키 == "휴대폰번호":
+            elif 키 == "휴대폰번호":
+                # ✅ 조사 제거
+                값 = re.sub(r"(010[-]?\d{3,4}[-]?\d{4})(을|를|이|가|은|는|으로|로)?", r"\1", 값)
                 값 = extract_phone(값)
 
 
 
+
             elif 키 == "회원번호":
+                # ✅ 조사 제거
+                값 = re.sub(r"([0-9]{6,8})(을|를|이|가|은|는|으로|로)", r"\1", 값)
                 값 = extract_member_number(값) or 값
 
 
 
+
             elif 키 == "비밀번호":
+                # ✅ 조사 제거
+                값 = re.sub(r"(\S+)(을|를|이|가|은|는|으로|로)?", r"\1", 값)
                 값 = extract_password(값) or 값
+
 
 
 
