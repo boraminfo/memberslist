@@ -17,6 +17,7 @@ from oauth2client.service_account import ServiceAccountCredentials
 import requests
 import time
 
+from flask import  Response
 
 
 
@@ -309,7 +310,7 @@ import re
 
 def clean_value_expression(text: str) -> str:
     # 문장 끝에 붙은 조사나 표현만 제거
-    particles = ['로', '으로', '은', '는', '을', '를', '수정해 줘']
+    particles = ['로', '으로', '은', '는', '을', '를', '값을','수정해 줘']
     for p in particles:
         # 끝에 붙은 조사 제거: "서울로", "회원번호는", "주소를" 등
         pattern = rf'({p})\s*$'
@@ -490,8 +491,43 @@ def parse_request_and_update_multi(data: str, member: dict) -> dict:
         if value_match:
             value = value_match.group(1).strip()
 
+           
+
             # ✅ 불필요한 명령어 제거
-            value = re.sub(r'(수정해줘|변경해줘|바꿔줘|해주세요|해주세요\.?|요청합니다\.?)$', '', value).strip()
+            value = re.sub(r'(으로|로)?\s*(저장|변경|수정|입력|해)?해(줘|주세요)?\.?$', '', value).strip()
+
+
+
+            # ✅ 숫자 필드 후처리
+            if keyword == "휴대폰번호":
+                # ✅ 조사 제거
+                value = re.sub(r'(010[-\d]+)[으]?(?:로|으로|에|을|를|은|는|이|가|도|만|과|와|까지|부터)?(?:\s|[.,\n]|$)?', r'\1', value)
+
+                # ✅ 숫자만 남기고 하이픈 포맷 적용
+                digits = re.sub(r"\D", "", value)
+                if len(digits) == 11 and digits.startswith("010"):
+                    value = f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+                else:
+                    value = digits
+
+
+
+
+
+            elif keyword == "회원번호":
+                # 조사 제거
+                value = re.sub(r'(\d+)[으]?(?:로|으로|에|을|를|은|는|이|가|도|만|과|와|까지|부터)?(?:\s|[.,\n]|$)?', r'\1', value)
+                print("조사 제거 후:", value)  # ← 여기에 추가
+
+                # 숫자만 추출
+                value = re.sub(r"\D", "", value)
+                print("숫자 추출 후:", value)  # ← 여기에 추가
+
+
+
+
+
+
 
             field = field_map[keyword]
             
@@ -784,18 +820,64 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
+
+
+            elif 키 == "가입일자":
+                # ✅ 꼬리 명령어 제거
+                값 = clean_tail_command(값)
+
+                # ✅ 조사 제거 (예: '2023-05-01로' → '2023-05-01')
+                값 = re.sub(r"(\d{4}-\d{2}-\d{2})(?:을|를|은|는|이|가|으로|로)?", r"\1", 값)
+
+                # ✅ 날짜 형식 추출
+                match = re.search(r"\d{4}-\d{2}-\d{2}", 값)
+                값 = match.group() if match else ""
+
+
+
+
+
+
             elif 키 == "생년월일":
                 if "지워" in block:
                     값 = ""
                 else:
+                    # ✅ 조사 제거 후 날짜 추출
+                    값 = re.sub(r"(을|를|은|는|이|가|으로|로)?\s*(\d{4}-\d{2}-\d{2})", r"\2", 값)
                     match_date = re.search(r"\d{4}-\d{2}-\d{2}", 값)
                     값 = match_date.group() if match_date else ""
 
 
 
+
+            elif 키 == "통신사":
+                # ✅ 꼬리 명령어 제거
+                값 = clean_tail_command(값)
+
+                # ✅ 조사 제거 (예: 'KT로', 'SK는', 'LGU+를' → 'KT', 'SK', 'LGU+')
+                값 = re.sub(r"([A-Za-z가-힣0-9\+\s]{2,10})(?:을|를|은|는|이|가|으로|로)?$", r"\1", 값)
+
+                # ✅ 공백 정리
+                값 = 값.strip()
+
+
+
+
+
+
+
+
             elif 키 == "친밀도":
+                # ✅ 꼬리 명령어 제거
+                값 = clean_tail_command(값)
+
+                # ✅ 조사 제거: 상/중/하 뒤에 붙은 모든 조사 제거
+                값 = re.sub(r"(상|중|하)(?:을|를|은|는|이|가|으로|로)?", r"\1", 값)
+
+                # ✅ 최종 값 정제
                 match = re.search(r"(상|중|하)", 값)
                 값 = match.group(1) if match else ""
+
 
 
 
@@ -822,8 +904,20 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
  
+
+
             elif 키 == "소개한분":
-                값 = extract_referrer(block) or 값  # ✅ 여기에 넣기
+                # ✅ 꼬리 명령어 제거
+                값 = clean_tail_command(값)
+
+                # ✅ 조사 제거 (예: '홍길동으로', '박철수는', '김민수의' → '홍길동', '박철수', '김민수')
+                값 = re.sub(r"([가-힣]{2,10})(?:을|를|은|는|이|가|의|으로|로)?$", r"\1", 값)
+
+                # ✅ 추출 함수로 최종 보정 (예: '소개한분은 김민수입니다' → '김민수')
+                값 = extract_referrer(block) or 값
+
+
+
 
 
 
@@ -881,28 +975,6 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 수정된필드["회원번호"] = member_no
 
     return member, 수정된필드
-
-
-
-   
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -2391,6 +2463,156 @@ def delete_order_confirm():
 
 
 
+
+
+
+
+
+# ✅ 조사 제거 함수 (이게 꼭 필요!)
+def remove_josa(text):
+    return re.sub(r'(으로|로|은|는|이|가|을|를|한|인|에게|에)?$', '', text)
+
+
+# ✅ 자연어 파서
+def parse_natural_query(user_input):
+    user_input = user_input.strip()
+
+    # ✅ 계보도 방향 표현 인식: 공백 유무 모두 대응
+    if "계보도" in user_input:
+        # '계보도 강소희 우측 회원', '계보도 강소희우측 회원', '계보도가 강소희우측인 회원' 모두 처리
+        pos_match = re.search(r"계보도.*?([가-힣]+)\s*(우측|좌측)", user_input)
+        if not pos_match:
+            pos_match = re.search(r"계보도.*?([가-힣]+)(우측|좌측)", user_input)
+        if pos_match:
+            기준회원 = pos_match.group(1).strip()
+            방향 = pos_match.group(2)
+            print("🎯 계보도 방향 파싱 →", "계보도", f"{기준회원} {방향}")
+            return "계보도", f"{기준회원}{방향}"
+
+    # ✅ 일반 키워드 매핑
+    keywords = {
+        "계보도": ["계보도"],
+        "소개한분": ["소개한분"],
+        "코드": ["코드"],
+        "분류": ["분류"],
+        "리더님": ["리더", "리더님"]
+    }
+
+    for field, triggers in keywords.items():
+        for trigger in triggers:
+            if trigger in user_input:
+                match = re.search(rf"{trigger}\s*(?:은|는|이|가|을|를|이란|이라는|에|으로|로)?\s*(.*)", user_input)
+                if match:
+                    raw_keyword = match.group(1).strip()
+                    cleaned = re.sub(r'(인|한|한\s+)?\s*회원$', '', raw_keyword)
+                    cleaned = re.split(r'[,\.\n\s]', cleaned)[0].strip()
+
+                    if cleaned.isdigit() and len(cleaned) == 8:
+                        return "회원번호", cleaned
+                    return field, cleaned
+    return None, None
+
+
+
+
+
+
+
+
+# ✅ 자연어 기반 회원 검색 API
+@app.route("/members/search-nl", methods=["POST"])
+def search_by_natural_language():
+    data = request.get_json()
+    query = data.get("query")
+    if not query:
+        return Response("query 파라미터가 필요합니다.", status=400)
+
+    offset = int(data.get("offset", 0))  # ✅ 추가된 부분
+
+    field, keyword = parse_natural_query(query)
+    print("🔍 추출된 필드:", field)
+    print("🔍 추출된 키워드:", keyword)
+
+    if not field or not keyword:
+        return Response("자연어에서 검색 필드와 키워드를 찾을 수 없습니다.", status=400)
+
+    try:
+        sheet = get_member_sheet()
+        records = sheet.get_all_records()
+
+
+        print("🧾 전체 키 목록:", records[0].keys())  # ← 여기!
+
+
+        normalized_field = field.strip()
+        normalized_keyword = keyword.strip().lower()
+
+
+
+        if normalized_field == "계보도":
+            normalized_keyword = normalized_keyword.replace(" ", "")
+
+
+
+
+
+        # ✅ 디버깅 출력
+        print("🧾 전체 키 목록:", records[0].keys() if records else "레코드 없음")
+        for m in records:
+            cell = str(m.get(normalized_field, "")).strip().lower()
+            print(f"🔎 '{normalized_keyword}' == '{cell}' → {normalized_keyword == cell}")
+
+        # ✅ 대소문자 구분 없이 정확히 일치
+        filtered = [
+            m for m in records
+            if normalized_keyword == str(m.get(normalized_field, "")).strip().lower().replace(" ", "")
+        ]
+
+
+        # ✅ 이름순 정렬
+        filtered.sort(key=lambda m: m.get("회원명", ""))
+
+
+
+
+        lines = [
+            f"{m.get('회원명', '')} (회원번호: {m.get('회원번호', '')}" +
+            (f", 비밀번호: {m.get('비밀번호', '')}" if m.get('비밀번호', '') else "") +
+            (f", 연락처: {m.get('휴대폰번호', '')}" if m.get('휴대폰번호', '') else "") +
+            (f", {remove_josa(str(m.get('코드', '')).strip())}" if m.get('코드', '') else "") +
+            ")"
+            for m in filtered[offset:offset+40]
+        ]
+
+
+
+
+
+
+
+        # ✅ 다음 있음 표시
+        has_more = offset + 40 < len(filtered)
+        if has_more:
+            lines.append("--- 다음 있음 ---")
+
+        response_text = "\n".join(lines) if lines else "조건에 맞는 회원이 없습니다."
+        return Response(response_text, mimetype='text/plain')
+
+    except Exception as e:
+        return Response(f"[서버 오류] {str(e)}", status=500)
+
+    
+
+
+
+
+
+
+
+
+
+
+
 @app.route("/debug_sheet", methods=["GET"])
 def debug_sheet():
     sheet = get_mymemo_sheet()
@@ -2399,7 +2621,7 @@ def debug_sheet():
 
 
 
-# 정리함
+
 
 
 
