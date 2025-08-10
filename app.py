@@ -3537,15 +3537,6 @@ def parse_and_save_order():
 
 
 
-
-
-
-
-
-
-
-
-
 # ✅ 루트 확인용
 @app.route("/")
 def hello():
@@ -3557,9 +3548,6 @@ def debug_sheet():
     sheet = get_mymemo_sheet()
     values = sheet.get_all_values()
     return jsonify(values), 200
-
-
-
 
 
 
