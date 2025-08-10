@@ -1,23 +1,96 @@
+from flask import Flask, request, jsonify
+import base64
+import requests
 import os
+import io
 import json
 import re
-import pandas as pd
+
+from openai import OpenAI
 import gspread
-import pytz
-import uuid
-import openai
-from flask import Flask, request, jsonify
-from google.oauth2.service_account import Credentials
-from dotenv import load_dotenv
-from gspread.utils import rowcol_to_a1
-from datetime import datetime
-from collections import Counter
 from oauth2client.service_account import ServiceAccountCredentials
 
-import requests
-import time
+from datetime import datetime, timedelta, timezone
 
+import pandas as pd
+import pytz
+import uuid
+from gspread.utils import rowcol_to_a1
+from collections import Counter
+
+import time
 from flask import  Response
+from PIL import Image
+
+import mimetypes
+
+import traceback
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 환경 변수 로드
+if os.getenv("RENDER") is None:  # 로컬에서 실행 중일 때만
+    from dotenv import load_dotenv
+    dotenv_path = os.path.abspath('.env')
+    if not os.path.exists(dotenv_path):
+        raise FileNotFoundError(f".env 파일이 존재하지 않습니다: {dotenv_path}")
+    load_dotenv(dotenv_path)
+
+# 환경변수에서 불러오기
+prompt_id = os.getenv("PROMPT_ID")
+prompt_version = os.getenv("PROMPT_VERSION")
+
+# ✅ OpenAI 클라이언트 초기화
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+GOOGLE_SHEET_TITLE = os.getenv("GOOGLE_SHEET_TITLE")
+
+# OpenAI API 설정
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENAI_API_URL = os.getenv("OPENAI_API_URL")
+
+# ✅ memberslist API 엔드포인트
+MEMBERSLIST_API_URL = os.getenv("MEMBERSLIST_API_URL")
+
+# ✅ Google Sheets 전역 클라이언트 초기화
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+client = gspread.authorize(creds)
+
+# 시트 연결
+sheet = client.open(GOOGLE_SHEET_TITLE)
+print(f"시트 '{GOOGLE_SHEET_TITLE}'에 연결되었습니다.")
+
+# ✅ 필수 환경 변수 확인
+if not GOOGLE_SHEET_TITLE:
+    raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+
+
+# ✅ 날짜 처리
+def process_order_date(text):
+    if not text:
+        return datetime.now().strftime("%Y-%m-%d")
+    return text.strip()
+
+# ✅ 한국 시간
+def now_kst():
+    return datetime.now(pytz.timezone("Asia/Seoul"))
+
+# ✅ Flask 초기화
+app = Flask(__name__)
+
+
+def get_worksheet(sheet_name):
+    return client.open(GOOGLE_SHEET_TITLE).worksheet(sheet_name)
+
 
 
 
@@ -29,38 +102,31 @@ def some_function():
     print("작업 완료")
 
 
-
-# ✅ 환경 변수 로드
-
-
-if os.getenv("RENDER") is None:  # 로컬에서 실행 중일 때만
-    from dotenv import load_dotenv
-    dotenv_path = os.path.abspath('.env')
-    if not os.path.exists(dotenv_path):
-        raise FileNotFoundError(f".env 파일이 존재하지 않습니다: {dotenv_path}")
-    load_dotenv(dotenv_path)
-
-# 공통 처리
-GOOGLE_SHEET_KEY = os.getenv("GOOGLE_SHEET_KEY")
-GOOGLE_SHEET_TITLE = os.getenv("GOOGLE_SHEET_TITLE")  # ✅ 시트명 불러오기
-
-# 한국 시간 가져오는 함수
-def now_kst():
-    return datetime.now(pytz.timezone("Asia/Seoul"))
-
-
-
 # ✅ 확인용 출력 (선택)
 print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
 
 
-app = Flask(__name__)
 
-if not os.getenv("GOOGLE_SHEET_KEY"):
-    raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
-if not os.getenv("GOOGLE_SHEET_TITLE"):  # ✅ 시트 이름도 환경변수에서 불러옴
-    raise EnvironmentError("환경변수 GOOGLE_SHEET_TITLE이 설정되지 않았습니다.")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # 자연어 명령 키워드 매핑
@@ -153,30 +219,6 @@ def get_backup_sheet():
     return get_worksheet("백업")
 
 
-# ✅ 환경 변수 로드 및 GPT API 키 설정
-openai.api_key = os.getenv("OPENAI_API_KEY")
-
-# ✅ Google Sheets 인증
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-client = gspread.authorize(creds)
-
-
-
-
-
-
-
-
-
-# ✅ Google Sheets 연동 함수
-def get_worksheet(sheet_name):
-    try:
-        sheet = client.open(GOOGLE_SHEET_TITLE)
-        return sheet.worksheet(sheet_name)
-    except Exception as e:
-        print(f"[시트 접근 오류] {e}")
-        return None
 
 
 
@@ -279,19 +321,24 @@ def find_member():
 
 
 
-
-def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
+def safe_update_cell(sheet, row, col, value, clear_first=True, max_retries=3, delay=2):
+    """
+    시트 셀을 안전하게 업데이트합니다.
+    - clear_first=True: 기존 값을 먼저 삭제한 후 새 값 기록
+    - max_retries: API 호출 재시도 횟수
+    - delay: 재시도 대기 시간 (지수 증가)
+    """
     for attempt in range(1, max_retries + 1):
         try:
-
-
-            sheet.update_cell(row, col, value)
+            if clear_first:
+                sheet.update_cell(row, col, "")  # ① 기존 값 비우기
+            sheet.update_cell(row, col, value)  # ② 새 값 쓰기
             return True
         except gspread.exceptions.APIError as e:
             if "429" in str(e):
                 print(f"[⏳ 재시도 {attempt}] 429 오류 → {delay}초 대기")
                 time.sleep(delay)
-                delay *= 2
+                delay *= 2  # 재시도 시 대기 시간 2배 증가
             else:
                 raise
     print("[❌ 실패] 최대 재시도 초과")
@@ -305,6 +352,8 @@ def safe_update_cell(sheet, row, col, value, max_retries=3, delay=2):
 
 
 
+# 수정 루틴
+# =======================================================================================
 
 import re
 
@@ -393,15 +442,15 @@ def update_member():
 
 
         수정결과 = []
-        for key, value in updated_member.items():
-            if key.endswith("_기록"):
-                continue
+        # 수정된 필드만 순회
+        for key, value in 수정된필드.items():
             if key.strip().lower() in headers:
                 col = headers.index(key.strip().lower()) + 1
+
                 print(f"[⬆️ 저장 시도] row={row_index}, col={col}, value={value}")
 
+                success = safe_update_cell(sheet, row_index, col, value, clear_first=True)
 
-                success = safe_update_cell(sheet, row_index, col, value)
                 if success:
                     수정결과.append({"필드": key, "값": value})
 
@@ -419,7 +468,6 @@ def update_member():
 
 
 # ========================================================================================
-# ================================
 # 예시 데이터베이스 (실제 환경에서는 DB 연동)
 mock_db = {
     "홍길동": {
@@ -779,7 +827,9 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
     for idx, (start, 키) in enumerate(positions):
         끝 = positions[idx + 1][0] if idx + 1 < len(positions) else len(data)
         block = data[start:끝]
-        match = re.search(rf"{키}\s*(?:를|은|는|이|가|:|：)?\s*(.+)", block)
+        match = re.search(rf"{키}(?:를|은|는|이|가|:|：)?\s*(.+)", block)
+
+
         if match:
 
             값 = match.group(1).strip()
@@ -950,9 +1000,20 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 value = value_candidate
                 if inferred_field == "회원번호":
                     value = re.sub(r"[^\d]", "", value)
-                elif inferred_field == "휴대폰번호":
-                    phone_match = re.search(r"010[-]?\d{3,4}[-]?\d{4}", value)
-                    value = phone_match.group(0) if phone_match else ""
+
+
+
+            elif inferred_field == "휴대폰번호":
+                digits = re.sub(r"\D", "", value)
+                if len(digits) == 11 and digits.startswith("010"):
+                    value = f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+                else:
+                    value = digits
+
+
+
+
+
 
                 수정된필드[inferred_field] = value
                 member[inferred_field] = value
@@ -961,11 +1022,17 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         # ✅ 추가: 여러 값이 있을 경우 각각 형식 기반 추론
         for token in tokens:
             # 휴대폰번호 형태
-            if re.match(r"010[-]?\d{3,4}[-]?\d{4}", token):
-                phone = extract_phone(token)
+
+            if re.match(r"010[-]?\d{3,4}[-]?\d{4}|010\d{8}", token):
+                digits = re.sub(r"\D", "", token)
+                if len(digits) == 11 and digits.startswith("010"):
+                    phone = f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+                else:
+                    phone = digits
                 member["휴대폰번호"] = phone
                 member["휴대폰번호_기록"] = f"(기록됨: {phone})"
                 수정된필드["휴대폰번호"] = phone
+
 
             # 숫자 6~8자리: 회원번호 추정
             elif re.match(r"^\d{6,8}$", token):
@@ -1100,7 +1167,13 @@ def save_member():
                     "주소": address
                 }.items():
                     if key in headers and value:
-                        sheet.update_cell(i + 2, headers.index(key) + 1, value)
+
+
+                        row_idx = i + 2
+                        col_idx = headers.index(key) + 1
+                        safe_update_cell(sheet, row_idx, col_idx, value, clear_first=True)
+
+
                 return jsonify({"message": f"{name} 기존 회원 정보 수정 완료"}), 200
 
         # ✅ 신규 등록
@@ -1153,7 +1226,8 @@ def update_member_address(member_name, address):
         print("[오류] '주소' 필드가 존재하지 않습니다.")
         return False
 
-    sheet.update_cell(row_index, col_index, address)
+    safe_update_cell(sheet, row_index, col_index, address, clear_first=True)
+
     print(f"[주소 업데이트 완료] {member_name} → {address}")
     return True
 
@@ -1206,10 +1280,9 @@ def save_memo():
 
 
 
-
-
-
+# ==========================================================================
 # ✅ 회원 삭제 API (안전 확인 포함)
+# ==========================================================================
 # ✅ 회원 삭제 API
 @app.route('/delete_member', methods=['POST'])
 def delete_member():
@@ -1243,6 +1316,303 @@ def delete_member():
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 회원 삭제 API (안전 확인 + 디버깅 포함)
+from itertools import chain
+
+def remove_spaces(s):
+    """문자열에서 모든 공백 제거"""
+    return re.sub(r"\s+", "", s)
+
+# 🔹 토큰 분리 유틸
+def split_to_parts(text):
+    """요청문을 구분자(와, 및, 그리고, , , 공백)로 분리"""
+    clean_text = re.sub(r"\s+", " ", text.strip())
+    return [p for p in re.split(r"와|및|그리고|,|\s+", clean_text) if p]
+
+
+
+
+# ✅ 회원 삭제 API (안전 확인 + 디버깅 포함)
+import re
+from itertools import chain
+from flask import request, jsonify
+
+# 🔹 필드 매핑
+field_map = {
+    "휴대폰번호": ["휴대폰번호", "핸드폰", "폰번호", "전화번호", "휴대폰"],
+    "회원번호": ["회원번호", "번호"],
+    "비밀번호": ["비밀번호", "비번", "pw", "패스워드"],
+    "가입일자": ["가입일자", "등록일", "가입일"],
+    "생년월일": ["생년월일", "생일", "출생일"],
+    "통신사": ["통신사", "이동통신사", "통신사명"],
+    "친밀도": ["친밀도", "관계도", "친분도"],
+    "근무처": ["근무처", "직장", "회사", "직장명"],
+    "소개한분": ["소개한분", "추천인", "소개자"],
+    "메모": ["메모", "노트", "비고"],
+    "코드": ["코드", "회원코드", "code"],
+    "주소": ["주소", "거주지", "배송지", "거주 주소"],
+    "계보도": ["계보도", "계보", "네트워크"],
+    "회원명": ["회원명", "이름", "성명", "Name"]
+}
+
+# 🔹 공백 제거 유틸
+def remove_spaces(s):
+    return re.sub(r"\s+", "", s)
+
+# 🔹 토큰 분리 유틸
+def split_to_parts(text):
+    """요청문을 구분자(와, 및, 그리고, , , 공백)로 분리"""
+    clean_text = re.sub(r"\s+", " ", text.strip())
+    return [p for p in re.split(r"와|및|그리고|,|\s+", clean_text) if p]
+
+@app.route('/delete_member_field_nl', methods=['POST'])
+def delete_member_field_nl():
+    try:
+        print("=" * 50)
+        print(f"[DEBUG] 요청 URL: {request.url}")
+        print(f"[DEBUG] 요청 메서드: {request.method}")
+
+        try:
+            print(f"[DEBUG] Raw Body: {request.data.decode('utf-8')}")
+        except Exception:
+            pass
+
+        req = request.get_json(force=True)
+        print(f"[DEBUG] 파싱된 요청 JSON: {req}")
+
+        text = req.get("요청문", "").strip()
+        print(f"[DEBUG] 요청문: '{text}'")
+
+        if not text:
+            return jsonify({"error": "요청문을 입력해야 합니다."}), 400
+
+        delete_keywords = ["삭제", "삭제해줘",  "비워", "비워줘", "초기화", "초기화줘",  "없애", "없애줘",  "지워", "지워줘"]
+
+        # 1️⃣ 토큰 분리
+        parts = split_to_parts(text)
+        print(f"[DEBUG] 분리된 토큰: {parts}")
+
+        # 2️⃣ 삭제 키워드 / 필드 키워드 매칭
+        has_delete_kw = any(remove_spaces(dk) in [remove_spaces(p) for p in parts] for dk in delete_keywords)
+        all_field_keywords = list(chain.from_iterable(field_map.values()))
+        has_field_kw = any(remove_spaces(fk) in [remove_spaces(p) for p in parts] for fk in all_field_keywords)
+
+        print(f"[DEBUG] 삭제 키워드 매칭: {has_delete_kw}, 필드 키워드 매칭: {has_field_kw}")
+
+        if not (has_delete_kw and has_field_kw):
+            print("[DEBUG] 삭제 명령 또는 필드 키워드 없음")
+            return jsonify({"error": "삭제 명령이 아니거나 필드명이 포함되지 않았습니다."}), 400
+
+        # 3️⃣ 정확 매칭된 필드 목록
+        matched_fields = []
+        for field, keywords in sorted(field_map.items(), key=lambda x: -max(len(k) for k in x[1])):
+            for kw in keywords:
+                if remove_spaces(kw) in [remove_spaces(p) for p in parts] and field not in matched_fields:
+                    matched_fields.append(field)
+
+        print(f"[DEBUG] 최종 매칭된 필드 목록: {matched_fields}")
+
+        return delete_member_field_nl_internal(text, matched_fields)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+def delete_member_field_nl_internal(text, matched_fields):
+    print(f"[DEBUG] 내부 로직 시작. 요청문: '{text}'")
+
+    # 회원명 추출
+    name_match = re.match(r"^(\S+)", text)
+    if not name_match:
+        return jsonify({"error": "회원명을 찾을 수 없습니다."}), 400
+    name = name_match.group(1)
+    print(f"[DEBUG] 추출된 회원명: '{name}'")
+
+    # 시트 데이터 로드
+    sheet = get_member_sheet()
+    try:
+        print(f"[DEBUG] 연결된 시트 ID: {sheet.spreadsheet.id}, 시트 이름: {sheet.title}")
+    except Exception as e:
+        print(f"[DEBUG] 시트 메타정보 조회 실패: {e}")
+
+    headers = sheet.row_values(1)
+    print(f"[DEBUG] 시트 헤더: {headers}")
+
+    data = sheet.get_all_records()
+    all_names = [row.get('회원명') for row in data]
+    print(f"[DEBUG] 시트 회원명 목록: {all_names}")
+
+    # 회원 찾기 및 필드 업데이트
+    for i, row in enumerate(data):
+        if row.get('회원명') == name:
+            print(f"[DEBUG] '{name}' 회원 발견 (시트 행 {i+2})")
+            for field in matched_fields:
+                if field in headers:
+                    col_index = headers.index(field) + 1
+                    print(f"[DEBUG] '{field}' → 열 인덱스 {col_index} 업데이트")
+                    sheet.update_cell(i + 2, col_index, "")
+                    sheet.update_cell(i + 2, col_index, "")
+                    print(f"[DEBUG] '{field}' 필드 공란 처리 완료")
+                else:
+                    print(f"[DEBUG] '{field}' 필드가 시트 헤더에 없음 → 업데이트 불가")
+            return jsonify({
+                "message": f"'{name}' 회원의 {matched_fields} 필드가 삭제(공란 처리)되었습니다."
+            }), 200
+
+    print(f"[DEBUG] '{name}' 회원을 시트에서 찾지 못함")
+    return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 메모 저장 루틴
+# ==================================================================================
+# 환경변수에서 API_BASE 불러오기 (없으면 예외 발생)
+API_BASE = os.getenv("API_BASE")
+
+# ===== 유틸 =====
+def quote_safe(text: str) -> str:
+    """요청문에 들어갈 값에서 줄바꿈/따옴표 등 최소 정제"""
+    if text is None:
+        return ""
+    return str(text).replace("\n", " ").replace("\r", " ").strip()
+
+def _has_token(text: str, pattern: str) -> bool:
+    """
+    단어 경계 기준으로 패턴 존재 여부를 판정합니다.
+    - 공백 허용: 회원\s*메모, 개인\s*메모 등
+    - 앞뒤가 한글/영문/숫자와 붙어 있으면 매칭하지 않음 (메모 vs 메모리 구분)
+    """
+    wrapped = rf'(?<![가-힣A-Za-z0-9])(?:{pattern})(?![가-힣A-Za-z0-9])'
+    return re.search(wrapped, text) is not None
+
+def _post(path: str, payload: dict):
+    """POST 요청 공용 처리"""
+    url = f"{API_BASE}{path}"
+    r = requests.post(url, json=payload, timeout=15)
+    try:
+        r.raise_for_status()
+    except requests.HTTPError:
+        print(f"[HTTP {r.status_code}] POST {url} -> {r.text}")
+        raise
+    return r
+
+# ===== 파서 =====
+def parse_memo_intent(command: str) -> str | None:
+    """
+    메모 관련 의도 판정
+    반환: 'personal' | 'db_memo' | None
+    우선순위: 개인메모 > 회원메모/메모
+    """
+    cmd = (command or "").strip()
+
+    # 1) 개인메모
+    if _has_token(cmd, r'개인\s*메모'):
+        return 'personal'
+
+    # 2) 회원메모 또는 일반 메모 → DB '메모' 컬럼
+    if _has_token(cmd, r'회원\s*메모') or _has_token(cmd, r'메모'):
+        return 'db_memo'
+
+    return None
+
+# ===== 액션 =====
+def update_member_field(member_name, field, value):
+    """회원 DB 시트의 특정 필드 수정 (기존값 삭제 후 새 값 저장)"""
+    member_name = quote_safe(member_name)
+    field = quote_safe(field)
+    value = quote_safe(value)
+
+    # 기존 값 삭제
+    _post("/updateMember", {
+        "요청문": f"{member_name} {field} ''"
+    })
+
+    # 새 값 저장
+    _post("/updateMember", {
+        "요청문": f"{member_name} {field} {value}"
+    })
+
+def save_personal_memo(member_name, memo):
+    """개인메모 시트에 새 행 추가"""
+    member_name = quote_safe(member_name)
+    memo = quote_safe(memo)
+
+    _post("/addCounseling", {
+        "요청문": f"{member_name} 개인메모 저장 {memo}",
+        "mode": "개인",           # 서버에서 '개인메모' 시트로 라우팅
+        "sheet_name": "개인메모", # 명시적 시트 지정 (서버에서 지원할 경우)
+        "allow_unregistered": True
+    })
+
+# ===== 메인 라우팅 =====
+def process_request(member_name, command, value):
+    """명령어 해석 후 적절한 시트에 저장"""
+    intent = parse_memo_intent(command)
+
+    if intent == 'personal':
+        save_personal_memo(member_name, value)
+    elif intent == 'db_memo':
+        update_member_field(member_name, "메모", value)
+    elif re.fullmatch(r"\d{6,10}", value):  # 숫자만 → 회원번호
+        update_member_field(member_name, "회원번호", value)
+    elif re.fullmatch(r"(01\d-\d{3,4}-\d{4})|(01\d\d{7,8})", value):  # 휴대폰 번호
+        update_member_field(member_name, "휴대폰번호", value)
+    else:
+        # 그 외 필드는 그대로 DB 수정
+        update_member_field(member_name, command, value)
+
+# ===== 사용 예시 =====
+# process_request("이판사", "메모", "날씨가 좋아요")
+# process_request("이판사", "회원메모", "회비 납부 확인")
+# process_request("이판사", "개인메모", "오늘은 비가 오지 않네요.")
+# process_request("홍길동", "아무거나", "123456")          # 회원번호 필드
+# process_request("홍길동", "아무거나", "010-1234-5678")   # 휴대폰번호 필드
 
 
 
@@ -1321,7 +1691,8 @@ def save_note():
 
 
 
-
+# 메모 저장 루틴
+# ==================================================================================
 
 # save_to_sheet(sheet_name, member_name, content)로 호출되며,
 # Google Sheets의 특정 시트에 상담일지 / 개인메모 / 활동일지 등을 저장하는 공통 함수입니다.
@@ -1354,18 +1725,6 @@ def save_to_sheet(sheet_name, member_name, content):
     except Exception as e:
         print(f"[시트 저장 오류: {sheet_name}] {e}")
         return False
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1482,7 +1841,9 @@ def add_counseling():
             row_index = matching_rows[0] + 2
             if field_name.lower() in headers:
                 col_index = headers.index(field_name.lower()) + 1
-                success = safe_update_cell(sheet, row_index, col_index, value)
+
+                success = safe_update_cell(sheet, row_index, col, value, clear_first=True)
+
                 if success:
                     return jsonify({"message": f"{member_name}님의 {field_name}이(가) DB 시트에 저장되었습니다."})
                 else:
@@ -1527,129 +1888,13 @@ def add_counseling():
 
 
 
+
+
+
+
+
+
     
-
-
-
-
-
-            
-    
-    
-    
-
-
-
-
-
-
-# ===========================================================================
-# 상담일지 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
-@app.route("/search_counseling_by_text_from_natural", methods=["POST"])
-def search_counseling_by_text_from_natural():
-    try:
-        data = request.get_json()
-        keywords = data.get("keywords", [])
-        limit = int(data.get("limit", 20))
-        sort_order = data.get("sort", "desc")
-        match_mode = data.get("match_mode", "any")
-
-        print("▶ 상담일지 검색 조건:", keywords, match_mode)
-
-        if not keywords or not isinstance(keywords, list):
-            return jsonify({"error": "keywords는 비어 있지 않은 리스트여야 합니다."}), 400
-
-        sheet = get_counseling_sheet()
-        values = sheet.get_all_values()[1:]
-        results = []
-
-        for row in values:
-            if len(row) < 3:
-                continue
-            date_str, member, content = row[0], row[1], row[2]
-
-            combined_text = f"{member} {content}"
-            if match_mode == "all" and not all(kw.lower() in combined_text.lower() for kw in keywords):
-                continue
-            if match_mode == "any" and not any(kw.lower() in combined_text.lower() for kw in keywords):
-                continue
-
-            try:
-                parsed_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
-            except ValueError:
-                continue
-
-            results.append({
-                "날짜": date_str,
-                "회원명": member,
-                "내용": content,
-                "날짜_obj": parsed_date
-            })
-
-        results.sort(key=lambda x: x["날짜_obj"], reverse=(sort_order == "desc"))
-
-        for r in results:
-            del r["날짜_obj"]
-
-        return jsonify({
-            "검색조건": {
-                "키워드": keywords,
-                "매칭방식": match_mode,
-                "정렬": sort_order
-            },
-            "검색결과": results[:limit]
-        }), 200
-
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
-
-
-# ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
-def run_counseling_search_from_natural_text(text):
-    ignore_words = ["상담일지", "검색", "에서", "해줘", "해", "줘"]
-    words = [kw for kw in text.split() if kw not in ignore_words]
-
-    if not words:
-        return jsonify({"error": "검색어가 없습니다."}), 400
-
-    match_mode = "all" if "동시" in words else "any"
-    keywords = [kw for kw in words if kw != "동시"]
-
-    with app.test_request_context(json={
-        "keywords": keywords,
-        "limit": 20,
-        "sort": "desc",
-        "match_mode": match_mode
-    }):
-        return search_counseling_by_text_from_natural()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ===========================================================================
 # 개인 메모 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
 @app.route("/search_memo_by_text", methods=["POST"])
@@ -1749,10 +1994,100 @@ def match_condition(text, keywords, mode):
 
 
 
+            
+    
+
+
+
+    
+    
 
 
 
 
+
+
+# ===========================================================================
+# 상담일지 시트에서 단어 기반으로 유사한 메모를 검색하는 기능을 수행합니다.
+@app.route("/search_counseling_by_text_from_natural", methods=["POST"])
+def search_counseling_by_text_from_natural():
+    try:
+        data = request.get_json()
+        keywords = data.get("keywords", [])
+        limit = int(data.get("limit", 20))
+        sort_order = data.get("sort", "desc")
+        match_mode = data.get("match_mode", "any")
+
+        print("▶ 상담일지 검색 조건:", keywords, match_mode)
+
+        if not keywords or not isinstance(keywords, list):
+            return jsonify({"error": "keywords는 비어 있지 않은 리스트여야 합니다."}), 400
+
+        sheet = get_counseling_sheet()
+        values = sheet.get_all_values()[1:]
+        results = []
+
+        for row in values:
+            if len(row) < 3:
+                continue
+            date_str, member, content = row[0], row[1], row[2]
+
+            combined_text = f"{member} {content}"
+            if match_mode == "all" and not all(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
+            if match_mode == "any" and not any(kw.lower() in combined_text.lower() for kw in keywords):
+                continue
+
+            try:
+                parsed_date = datetime.strptime(date_str, "%Y-%m-%d %H:%M")
+            except ValueError:
+                continue
+
+            results.append({
+                "날짜": date_str,
+                "회원명": member,
+                "내용": content,
+                "날짜_obj": parsed_date
+            })
+
+        results.sort(key=lambda x: x["날짜_obj"], reverse=(sort_order == "desc"))
+
+        for r in results:
+            del r["날짜_obj"]
+
+        return jsonify({
+            "검색조건": {
+                "키워드": keywords,
+                "매칭방식": match_mode,
+                "정렬": sort_order
+            },
+            "검색결과": results[:limit]
+        }), 200
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
+def run_counseling_search_from_natural_text(text):
+    ignore_words = ["상담일지", "검색", "에서", "해줘", "해", "줘"]
+    words = [kw for kw in text.split() if kw not in ignore_words]
+
+    if not words:
+        return jsonify({"error": "검색어가 없습니다."}), 400
+
+    match_mode = "all" if "동시" in words else "any"
+    keywords = [kw for kw in words if kw != "동시"]
+
+    with app.test_request_context(json={
+        "keywords": keywords,
+        "limit": 20,
+        "sort": "desc",
+        "match_mode": match_mode
+    }):
+        return search_counseling_by_text_from_natural()
 
 
 
@@ -1944,274 +2279,50 @@ def run_all_memo_search_from_natural_text(text):
     
 
 
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 파싱된 주문 데이터를 받아 Google Sheets의 제품주문 시트에 저장하는 함수 handle_order_save(data)입니다.
-
-# 즉, parse_order_text() 같은 파서에서 추출된 dict 형태의 주문 정보를 받아
-# → 1줄로 정리된 주문 행(row)을 만들어
-# → 시트에 추가하거나 중복이면 무시하려는 목적입니다.
-
-# ✅ 공통 주문 저장 함수
-
-# ✅ 주문 저장 함수
-def handle_order_save(data):
-    sheet = get_worksheet("제품주문")
-    if not sheet:
-        raise Exception("제품주문 시트를 찾을 수 없습니다.")
-
-    order_date = process_order_date(data.get("주문일자", ""))
-    # ✅ 회원명 정제
-    raw_name = data.get("회원명", "")
-    name = re.sub(r"\s*등록$", "", raw_name).strip()
-    row = [
-        order_date,
-        data.get("회원명", ""),
-        data.get("회원번호", ""),
-        data.get("휴대폰번호", ""),
-        data.get("제품명", ""),
-        float(data.get("제품가격", 0)),
-        float(data.get("PV", 0)),
-        data.get("결재방법", ""),
-        data.get("주문자_고객명", ""),
-        data.get("주문자_휴대폰번호", ""),
-        data.get("배송처", ""),
-        data.get("수령확인", "")
-    ]
-
-    values = sheet.get_all_values()
-    if not values:
-        headers = [
-            "주문일자", "회원명", "회원번호", "휴대폰번호",
-            "제품명", "제품가격", "PV", "결재방법",
-            "주문자_고객명", "주문자_휴대폰번호", "배송처", "수령확인"
-        ]
-        sheet.append_row(headers)
-
-    # 중복 방지 로직
-    #for existing in values[1:]:
-    #    if (existing[0] == order_date and
-    #        existing[1] == data.get("회원명") and
-    #        existing[4] == data.get("제품명")):
-    #        print("⚠️ 이미 동일한 주문이 존재하여 저장하지 않음")
-    #        return
-
-    #sheet.insert_row(row, index=2)
-
-
-def handle_product_order(text, member_name):
-    try:
-        parsed = parse_order_text(text)  # 자연어 문장 → 주문 dict 변환
-        parsed["회원명"] = member_name
-        handle_order_save(parsed)  # 실제 시트 저장
-        return jsonify({"message": f"{member_name}님의 제품주문 저장이 완료되었습니다."})
-    except Exception as e:
-        return jsonify({"error": f"제품주문 처리 중 오류 발생: {str(e)}"}), 500
-
-
-
-
-
-
-
-
-
-
 
 
 
 # ✅ 제품주문시 날짜 입력으로 등록처리 
-
-# ✅ 주문일자 처리
+# ✅ 날짜 처리 통합 함수
 def process_order_date(raw_date: str) -> str:
     try:
         if not raw_date or raw_date.strip() == "":
             return now_kst().strftime('%Y-%m-%d')
 
-        raw_date = raw_date.strip()
+        text = raw_date.strip()
+        today = now_kst()
 
-        if "오늘" in raw_date:
-            return now_kst().strftime('%Y-%m-%d')
-        elif "어제" in raw_date:
-            return (now_kst() - timedelta(days=1)).strftime('%Y-%m-%d')
-        elif "내일" in raw_date:
-            return (now_kst() + timedelta(days=1)).strftime('%Y-%m-%d')
+        # ✅ "오늘", "어제", "내일"
+        if "오늘" in text:
+            return today.strftime('%Y-%m-%d')
+        elif "어제" in text:
+            return (today - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif "내일" in text:
+            return (today + timedelta(days=1)).strftime('%Y-%m-%d')
 
-        datetime.strptime(raw_date, "%Y-%m-%d")
-        return raw_date
-    except Exception:
-        return now_kst().strftime('%Y-%m-%d')
+        # ✅ YYYY-MM-DD 포맷 직접 확인
+        try:
+            dt = datetime.strptime(text, "%Y-%m-%d")
+            return dt.strftime("%Y-%m-%d")
+        except ValueError:
+            pass
 
-
-
-
-
-
-
-
-
-
-
-# 아이패드에서 이미지 인식으로 추출한 주문 데이터를 JSON 형태로 받아,
-# Google Sheets의 "제품주문" 시트에 저장하는 API입니다.
-
-# ✅ 아이패드에서 이미지 입력으로 제품주문처리 이미지 json으로 처리
-
-# 주문 저장 엔드포인트
-@app.route("/add_orders", methods=["POST"])
-def add_orders():  # ← 누락된 함수 선언 추가
-    data = request.json
-    회원명 = data.get("회원명")
-    orders = data.get("orders", [])
-
-    try:
-        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # ← 환경변수에서 시트명 로딩
-        spreadsheet = client.open(sheet_title)
-        sheet = spreadsheet.worksheet("제품주문")
-
-        # ✅ DB 시트에서 회원번호, 휴대폰번호 추출
-        db_sheet = spreadsheet.worksheet("DB")
-        member_records = db_sheet.get_all_records()
-
-        회원번호 = ""
-        회원_휴대폰번호 = ""
-        for record in member_records:
-            if record.get("회원명") == 회원명:
-                회원번호 = record.get("회원번호", "")
-                회원_휴대폰번호 = record.get("휴대폰번호", "")
-                break
-
-        # ✅ 주문 내용 시트에 삽입
-        if orders:
-            row_index = 2  # 항상 2행부터 위로 삽입
-            for order in orders:
-                row = [
-                    order.get("주문일자", datetime.now().strftime("%Y-%m-%d")),  # ✅ 주문일자 우선, 없으면 오늘
-                    회원명,
-                    회원번호,
-                    회원_휴대폰번호,
-                    order.get("제품명", ""),
-                    order.get("제품가격", ""),
-                    order.get("PV", ""),
-                    order.get("결재방법", ""),
-                    order.get("주문자_고객명", ""),
-                    order.get("주문자_휴대폰번호", ""),
-                    order.get("배송처", ""),
-                    order.get("수령확인", "")
-                ]
-                sheet.insert_row(row, row_index)
-                row_index += 1
-
-        return jsonify({"status": "success", "message": "주문이 저장되었습니다."})
-
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
-    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 이미지에서 추출한 제품 주문 데이터를 JSON 형식으로 받아서, Google Sheets의 "제품주문" 시트에 한 줄씩 저장하는 API입니다.
-
-# ✅ 컴퓨터에서 이미지 입력으로 제품주문처리
-
-def get_worksheet(sheet_name):
-    sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # env에서 불러옴
-    spreadsheet = client.open(sheet_title)
-    worksheet = spreadsheet.worksheet(sheet_name)
-    return worksheet
-
-
-def append_row_to_sheet(sheet, row):
-    sheet.append_row(row, value_input_option="USER_ENTERED")
-
-@app.route('/save_order_from_json', methods=['POST'])
-def save_order_from_json():
-    try:
-        data = request.get_json()
-        sheet = get_worksheet("제품주문")
-
-        if not isinstance(data, list):
-            return jsonify({"error": "JSON은 리스트 형식이어야 합니다."}), 400
-
-        for item in data:
-            row = [
-                "",  # 주문일자 무시
-                "",  # 회원명 무시
-                "",  # 회원번호 무시
-                "",  # 휴대폰번호 무시
-                item.get("제품명", ""),
-                item.get("제품가격", ""),
-                item.get("PV", ""),
-                "",  # 결재방법 무시
-                item.get("주문자_고객명", ""),
-                item.get("주문자_휴대폰번호", ""),
-                item.get("배송처", ""),
-                "",  # 수령확인 무시
-            ]
-            append_row_to_sheet(sheet, row)
-
-        return jsonify({"status": "success", "count": len(data)})
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
-
-
-
-
-
-# ✅ 음성으로 제품등록 
-
-# ✅ 날짜 파싱
-def parse_date(text):
-    today = datetime.today()
-    if "오늘" in text:
-        return today.strftime("%Y-%m-%d")
-    elif "어제" in text:
-        return (today - timedelta(days=1)).strftime("%Y-%m-%d")
-    else:
-        match = re.search(r"(20\d{2}[./-]\d{1,2}[./-]\d{1,2})", text)
+        # ✅ YYYY.MM.DD or YYYY/MM/DD → YYYY-MM-DD 변환
+        match = re.search(r"(20\d{2})[./-](\d{1,2})[./-](\d{1,2})", text)
         if match:
-            return re.sub(r"[./]", "-", match.group(1))
-    return today.strftime("%Y-%m-%d")
+            y, m, d = match.groups()
+            return f"{int(y):04d}-{int(m):02d}-{int(d):02d}"
+
+    except Exception as e:
+        print(f"[날짜 파싱 오류] {e}")
+
+    # ✅ 실패 시 오늘 날짜 반환
+    return now_kst().strftime('%Y-%m-%d')
+
+
+
+
+
 
 
 
@@ -2260,87 +2371,12 @@ def parse_order_text(text):
         result["배송처"] = ""
 
     # 5. 주문일자
-    result["주문일자"] = parse_date(text)
+    result["주문일자"] = process_order_date(text)
 
     return result
 
 
 
-
-
-
-
-
-
-
-# parse_order_text()로부터 추출된 주문 정보를 받아, Google Sheets의 "제품주문" 시트에 한 줄로 저장하는 함수입니다.
-
-# ✅ 주문 저장
-def save_order_to_sheet(parsed):
-    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
-    sheet_title = os.getenv("GOOGLE_SHEET_TITLE")
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-    client = gspread.authorize(creds)
-
-    ss = client.open(sheet_title)
-    db_sheet = ss.worksheet("DB")
-    order_sheet = ss.worksheet("제품주문")
-
-    # 회원 정보 조회
-    members = db_sheet.get_all_records()
-    회원명 = parsed["회원명"]
-    회원번호 = ""
-    회원_휴대폰 = ""
-    for m in members:
-        if m.get("회원명") == 회원명:
-            회원번호 = m.get("회원번호", "")
-            회원_휴대폰 = m.get("휴대폰번호", "")
-            break
-
-    for _ in range(parsed.get("수량", 1)):
-        row = [
-            parsed.get("주문일자"),
-            회원명,
-            회원번호,
-            회원_휴대폰,
-            parsed.get("제품명"),
-            "0",  # 제품가격
-            "0",  # PV
-            parsed.get("결재방법"),
-            회원명,
-            회원_휴대폰,
-            parsed.get("배송처"),
-            "0"
-        ]
-        order_sheet.insert_row(row, 2, value_input_option="USER_ENTERED")
-
-
-
-
-
-
-
-
-
-# 클라이언트로부터 주문 관련 자연어 문장을 받아서 분석(파싱)한 후, Google Sheets 같은 시트에 저장하는 역할
-# POST 요청의 JSON body에서 "text" 필드 값을 받아와 user_input 변수에 저장
-# 예: "김지연 노니 2개 카드 주문 저장" 같은 자연어 문장
-
-# ✅ API 엔드포인트
-@app.route("/parse_and_save_order", methods=["POST"])
-def parse_and_save_order():
-    try:
-        user_input = request.json.get("text", "")
-        parsed = parse_order_text(user_input)
-        save_order_to_sheet(parsed)
-        return jsonify({
-            "status": "success",
-            "message": f"{parsed['회원명']}님의 주문이 저장되었습니다.",
-            "parsed": parsed
-        })
-    except Exception as e:
-        return jsonify({"status": "error", "message": str(e)}), 500
 
 
 
@@ -2606,13 +2642,914 @@ def search_by_natural_language():
 
 
 
-# 수정했음
 
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# =================================================================
+# 제품 주문
+# =================================================================
+# ✅ 날짜 파싱
+def parse_date(text):
+    date_match = re.search(r"(\d{4}[-/]\d{1,2}[-/]\d{1,2})", text)
+    if date_match:
+        return date_match.group(1)
+    return now_kst().strftime("%Y-%m-%d")
+
+# ✅ 규칙 기반 자연어 파싱
+def parse_order_text(text):
+    result = {}
+
+    match = re.match(r"(\S+)(?:님)?", text)
+    if match:
+        result["회원명"] = match.group(1)
+
+    prod_match = re.search(r"([\w가-힣]+)[\s]*(\d+)\s*개", text)
+    if prod_match:
+        result["제품명"] = prod_match.group(1)
+        result["수량"] = int(prod_match.group(2))
+    else:
+        result["제품명"] = "제품"
+        result["수량"] = 1
+
+    if "카드" in text:
+        result["결재방법"] = "카드"
+    elif "현금" in text:
+        result["결재방법"] = "현금"
+    elif "계좌" in text:
+        result["결재방법"] = "계좌이체"
+    else:
+        result["결재방법"] = "카드"
+
+    address_match = re.search(r"(?:주소|배송지)[:：]\s*(.+?)(\s|$)", text)
+    if address_match:
+        result["배송처"] = address_match.group(1).strip()
+    else:
+        result["배송처"] = ""
+
+    result["주문일자"] = parse_date(text)
+
+    return result
+
+
+
+
+
+# ✅ 한국 시간
+def now_kst():
+    return datetime.now(timezone(timedelta(hours=9)))
+
+# =================================================================
+# 제품 주문
+# =================================================================
+# ✅ 제품주문 시트 저장
+# ✅ memberslist API 호출 함수
+def addOrders(payload):
+    resp = requests.post(MEMBERSLIST_API_URL, json=payload)
+    resp.raise_for_status()
+    return resp.json()
+
+# 🔹 GPT Vision 분석 함수
+def extract_order_from_uploaded_image(image_bytes):
+    """
+    image_bytes: BytesIO 객체
+    """
+    image_base64 = base64.b64encode(image_bytes.getvalue()).decode("utf-8")
+
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+
+    prompt = (
+        "이미지를 분석하여 JSON 형식으로 추출하세요. "
+        "여러 개의 제품이 있을 경우 'orders' 배열에 모두 담으세요. "
+        "질문하지 말고 추출된 orders 전체를 그대로 저장할 준비를 하세요. "
+        "(이름, 휴대폰번호, 주소)는 소비자 정보임. "
+        "회원명, 결재방법, 수령확인, 주문일자 무시. "
+        "필드: 제품명, 제품가격, PV, 주문자_고객명, 주문자_휴대폰번호, 배송처"
+    )
+
+
+    payload = {
+        "model": "gpt-4o",
+        "messages": [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {
+                        "url": f"data:image/jpeg;base64,{image_base64}"
+                    }}
+                ]
+            }
+        ],
+        "temperature": 0
+    }
+
+    response = requests.post(OPENAI_API_URL, headers=headers, json=payload)
+    response.raise_for_status()
+
+    result_text = response.json()["choices"][0]["message"]["content"]
+
+    # 코드블록 제거
+    clean_text = re.sub(r"```(?:json)?", "", result_text).strip()
+
+    try:
+        order_data = json.loads(clean_text)
+        return order_data
+    except json.JSONDecodeError:
+        return {"raw_text": result_text}
+
+
+
+
+
+
+
+
+
+
+# =========================================================
+# 자동 분기 라우트 (iPad / PC)
+# =========================================================
+@app.route("/upload_order", methods=["POST"])
+def upload_order_auto():
+    user_agent = request.headers.get("User-Agent", "").lower()
+
+    # PC / iPad 판별
+    is_pc = ("windows" in user_agent) or ("macintosh" in user_agent)
+
+    if is_pc:
+        return upload_order_pc()  # PC 전용
+    else:
+        return upload_order_ipad()  # iPad 전용
+
+
+
+# ✅ 업로드 라우트 (iPad 명령어 자동 감지)
+@app.route("/upload_order_ipad", methods=["POST"])  
+def upload_order_ipad():
+    mode = request.form.get("mode") or request.args.get("mode")
+    member_name = request.form.get("회원명")
+    image_file = request.files.get("image")
+    image_url = request.form.get("image_url")
+    message_text = request.form.get("message", "").strip()
+
+    # 🔹 iPad 명령어 자동 감지
+    if not mode and "제품주문 저장" in message_text:
+        mode = "api"
+        possible_name = message_text.replace("제품주문 저장", "").strip()
+        if possible_name:
+            member_name = possible_name
+
+    if not mode:
+        mode = "api"
+
+    if not member_name:
+        return jsonify({"error": "회원명 필드 또는 message에서 회원명을 추출할 수 없습니다."}), 400
+
+    try:
+        # 이미지 가져오기
+        if image_file:
+            image_bytes = io.BytesIO(image_file.read())
+        elif image_url:
+            img_response = requests.get(image_url)
+            if img_response.status_code != 200:
+                return jsonify({"error": "이미지 다운로드 실패"}), 400
+            image_bytes = io.BytesIO(img_response.content)
+        else:
+            return jsonify({"error": "image(파일) 또는 image_url이 필요합니다."}), 400
+
+        # GPT Vision 분석
+        order_data = extract_order_from_uploaded_image(image_bytes)
+
+        # orders 배열 보정
+        if isinstance(order_data, dict) and "orders" in order_data:
+            orders_list = order_data["orders"]
+        elif isinstance(order_data, dict):
+            orders_list = [order_data]
+        else:
+            return jsonify({"error": "GPT 응답이 올바른 JSON 형식이 아닙니다.", "응답": order_data}), 500
+
+        # 🔹 결재방법, 수령확인 무조건 공란 처리
+        for order in orders_list:
+            order["결재방법"] = ""
+            order["수령확인"] = ""
+
+
+
+        if mode == "api":
+            save_result = addOrders({
+                "회원명": member_name,
+                "orders": orders_list
+            })
+            return jsonify({
+                "mode": "api",
+                "message": f"{member_name}님의 주문이 저장되었습니다. (memberslist API)",
+                "추출된_JSON": orders_list,
+                "저장_결과": save_result
+            })
+
+        elif mode == "sheet":
+            # Google Sheets 직접 저장 로직 (get_worksheet 구현 필요)
+            db_ws = get_worksheet("DB")
+            records = db_ws.get_all_records()
+            member_info = next((r for r in records if r.get("회원명") == member_name), None)
+            if not member_info:
+                return jsonify({"error": f"회원 '{member_name}'을(를) 찾을 수 없습니다."}), 404
+
+            order_date = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+            orders_ws = get_worksheet("제품주문")
+            for product in order_data.get("제품목록", []):
+                orders_ws.append_row([
+                    order_date,
+                    member_name,
+                    member_info.get("회원번호"),
+                    member_info.get("휴대폰번호"),
+                    product.get("제품명"),
+                    product.get("제품가격"),
+                    product.get("PV"),
+                    product.get("주문자_고객명"),
+                    product.get("주문자_휴대폰번호"),
+                    product.get("배송처"),
+                    "",
+                    ""
+                ])
+            return jsonify({
+                "mode": "sheet",
+                "status": "success",
+                "saved_rows": len(order_data.get("제품목록", []))
+            })
+
+        else:
+            return jsonify({"error": "mode 값은 'api' 또는 'sheet'여야 합니다."}), 400
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    
+
+
+
+
+# ================================================================================
+# ✅ PC 전용 업로드 (회원명 + "제품주문 저장" + 이미지)
+@app.route("/upload_order_pc", methods=["POST"])
+def upload_order_pc():
+    mode = request.form.get("mode") or request.args.get("mode")
+    member_name = request.form.get("회원명")
+    image_file = request.files.get("image")
+    image_url = request.form.get("image_url")
+    message_text = request.form.get("message", "").strip()
+
+    # 🔹 PC 명령어 자동 감지
+    if not mode and "제품주문 저장" in message_text:
+        mode = "api"
+        possible_name = message_text.replace("제품주문 저장", "").strip()
+        if possible_name:
+            member_name = possible_name
+
+    if not mode:
+        mode = "api"
+
+    if not member_name:
+        return jsonify({"error": "회원명 필드 또는 message에서 회원명을 추출할 수 없습니다."}), 400
+
+    try:
+        # 이미지 가져오기
+        if image_file:
+            image_bytes = io.BytesIO(image_file.read())
+        elif image_url:
+            img_response = requests.get(image_url)
+            if img_response.status_code != 200:
+                return jsonify({"error": "이미지 다운로드 실패"}), 400
+            image_bytes = io.BytesIO(img_response.content)
+        else:
+            return jsonify({"error": "image(파일) 또는 image_url이 필요합니다."}), 400
+
+        # GPT Vision 분석
+        order_data = extract_order_from_uploaded_image(image_bytes)
+
+        # orders 배열 보정
+        if isinstance(order_data, dict) and "orders" in order_data:
+            orders_list = order_data["orders"]
+        elif isinstance(order_data, dict):
+            orders_list = [order_data]
+        else:
+            return jsonify({"error": "GPT 응답이 올바른 JSON 형식이 아닙니다.", "응답": order_data}), 500
+
+        if mode == "api":
+            save_result = addOrders({
+                "회원명": member_name,
+                "orders": orders_list
+            })
+            return jsonify({
+                "mode": "api",
+                "message": f"{member_name}님의 주문이 저장되었습니다. (memberslist API)",
+                "추출된_JSON": orders_list,
+                "저장_결과": save_result
+            })
+
+        elif mode == "sheet":
+            # Google Sheets 직접 저장 로직
+            db_ws = get_worksheet("DB")
+            records = db_ws.get_all_records()
+            member_info = next((r for r in records if r.get("회원명") == member_name), None)
+            if not member_info:
+                return jsonify({"error": f"회원 '{member_name}'을(를) 찾을 수 없습니다."}), 404
+
+            order_date = now_kst().strftime("%Y-%m-%d %H:%M:%S")
+            orders_ws = get_worksheet("제품주문")
+            for product in order_data.get("제품목록", []):
+                orders_ws.append_row([
+                    order_date,
+                    member_name,
+                    member_info.get("회원번호"),
+                    member_info.get("휴대폰번호"),
+                    product.get("제품명"),
+                    product.get("제품가격"),
+                    product.get("PV"),
+                    product.get("주문자_고객명"),
+                    product.get("주문자_휴대폰번호"),
+                    product.get("배송처"),
+                    "",
+                    ""
+                ])
+            return jsonify({
+                "mode": "sheet",
+                "status": "success",
+                "saved_rows": len(order_data.get("제품목록", []))
+            })
+
+        else:
+            return jsonify({"error": "mode 값은 'api' 또는 'sheet'여야 합니다."}), 400
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ==========================================================================
+# 자연어 입력으로 제품주문 저장
+# memberslist API 저장
+# GPT로 자연어 주문 파싱
+def parse_order_from_text(text):
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    prompt = f"""
+다음 문장에서 주문 정보를 JSON 형식으로 추출하세요.
+여러 개의 제품이 있을 경우 'orders' 배열에 모두 담으세요.
+질문하지 말고 추출된 orders 전체를 그대로 저장할 준비를 하세요.
+(이름, 휴대폰번호, 주소)는 소비자 정보임.
+회원명, 결재방법, 수령확인, 주문일자 무시.
+필드: 제품명, 제품가격, PV, 결재방법, 주문자_고객명, 주문자_휴대폰번호, 배송처.
+
+입력 문장:
+{text}
+
+JSON 형식:
+{{
+    "orders": [
+        {{
+            "제품명": "...",
+            "제품가격": ...,
+            "PV": ...,
+            "결재방법": "...",
+            "주문자_고객명": "...",
+            "주문자_휴대폰번호": "...",
+            "배송처": "..."
+        }}
+    ]
+}}
+"""
+    payload = {
+        "model": "gpt-4o",
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0
+    }
+    response = requests.post(OPENAI_API_URL, headers=headers, json=payload)
+    response.raise_for_status()
+    result_text = response.json()["choices"][0]["message"]["content"]
+
+    # 코드블록 제거 (멀티라인 지원)
+    clean_text = re.sub(r"```(?:json)?", "", result_text, flags=re.MULTILINE).strip()
+    try:
+        return json.loads(clean_text)
+    except json.JSONDecodeError:
+        return {"raw_text": result_text}
+
+# 자연어 주문 저장 라우트 (PC용)
+@app.route("/upload_order_text", methods=["POST"])
+def upload_order_text():
+    text = request.form.get("message") or (request.json.get("message") if request.is_json else None)
+    if not text:
+        return jsonify({"error": "message 필드가 필요합니다."}), 400
+
+    # 회원명 추출 (제품주문 저장 앞부분)
+    member_name_match = re.match(r"^(\S+)\s*제품주문\s*저장", text)
+    if not member_name_match:
+        return jsonify({"error": "회원명을 찾을 수 없습니다."}), 400
+    member_name = member_name_match.group(1)
+
+    # GPT로 파싱
+    order_data = parse_order_from_text(text)
+    if not order_data.get("orders"):
+        return jsonify({"error": "주문 정보를 추출하지 못했습니다.", "응답": order_data}), 400
+
+    try:
+        # memberslist API 저장
+        save_result = addOrders({
+            "회원명": member_name,
+            "orders": order_data["orders"]
+        })
+        return jsonify({
+            "status": "success",
+            "회원명": member_name,
+            "추출된_JSON": order_data["orders"],
+            "저장_결과": save_result
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 파싱된 주문 데이터를 받아 Google Sheets의 제품주문 시트에 저장하는 함수 handle_order_save(data)입니다.
+
+# 즉, parse_order_text() 같은 파서에서 추출된 dict 형태의 주문 정보를 받아
+# → 1줄로 정리된 주문 행(row)을 만들어
+# → 시트에 추가하거나 중복이면 무시하려는 목적입니다.
+
+# ✅ 공통 주문 저장 함수
+
+# ✅ 주문 저장 함수
+def handle_order_save(data):
+    sheet = get_worksheet("제품주문")
+    if not sheet:
+        raise Exception("제품주문 시트를 찾을 수 없습니다.")
+
+    order_date = process_order_date(data.get("주문일자", ""))
+    # ✅ 회원명 정제
+    raw_name = data.get("회원명", "")
+    name = re.sub(r"\s*등록$", "", raw_name).strip()
+    row = [
+        order_date,
+        data.get("회원명", ""),
+        data.get("회원번호", ""),
+        data.get("휴대폰번호", ""),
+        data.get("제품명", ""),
+        float(data.get("제품가격", 0)),
+        float(data.get("PV", 0)),
+        data.get("결재방법", ""),
+        data.get("주문자_고객명", ""),
+        data.get("주문자_휴대폰번호", ""),
+        data.get("배송처", ""),
+        data.get("수령확인", "")
+    ]
+
+    values = sheet.get_all_values()
+    if not values:
+        headers = [
+            "주문일자", "회원명", "회원번호", "휴대폰번호",
+            "제품명", "제품가격", "PV", "결재방법",
+            "주문자_고객명", "주문자_휴대폰번호", "배송처", "수령확인"
+        ]
+        sheet.append_row(headers)
+
+    # 중복 방지 로직
+    #for existing in values[1:]:
+    #    if (existing[0] == order_date and
+    #        existing[1] == data.get("회원명") and
+    #        existing[4] == data.get("제품명")):
+    #        print("⚠️ 이미 동일한 주문이 존재하여 저장하지 않음")
+    #        return
+
+    #sheet.insert_row(row, index=2)
+
+
+def handle_product_order(text, member_name):
+    try:
+        parsed = parse_order_text(text)  # 자연어 문장 → 주문 dict 변환
+        parsed["회원명"] = member_name
+        handle_order_save(parsed)  # 실제 시트 저장
+        return jsonify({"message": f"{member_name}님의 제품주문 저장이 완료되었습니다."})
+    except Exception as e:
+        return jsonify({"error": f"제품주문 처리 중 오류 발생: {str(e)}"}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 제품주문시 날짜 입력으로 등록처리 
+
+# ✅ 주문일자 처리
+def process_order_date(raw_date: str) -> str:
+    try:
+        if not raw_date or raw_date.strip() == "":
+            return now_kst().strftime('%Y-%m-%d')
+
+        raw_date = raw_date.strip()
+
+        if "오늘" in raw_date:
+            return now_kst().strftime('%Y-%m-%d')
+        elif "어제" in raw_date:
+            return (now_kst() - timedelta(days=1)).strftime('%Y-%m-%d')
+        elif "내일" in raw_date:
+            return (now_kst() + timedelta(days=1)).strftime('%Y-%m-%d')
+
+        datetime.strptime(raw_date, "%Y-%m-%d")
+        return raw_date
+    except Exception:
+        return now_kst().strftime('%Y-%m-%d')
+
+
+
+
+
+
+
+
+
+
+
+
+# 아이패드에서 이미지 인식으로 추출한 주문 데이터를 JSON 형태로 받아,
+# Google Sheets의 "제품주문" 시트에 저장하는 API입니다.
+
+# ✅ 아이패드에서 이미지 입력으로 제품주문처리 이미지 json으로 처리
+
+# 주문 저장 엔드포인트
+@app.route("/add_orders", methods=["POST"])
+def add_orders():  # ← 누락된 함수 선언 추가
+    data = request.json
+    회원명 = data.get("회원명")
+    orders = data.get("orders", [])
+
+    try:
+        sheet_title = os.getenv("GOOGLE_SHEET_TITLE")  # ← 환경변수에서 시트명 로딩
+        spreadsheet = client.open(sheet_title)
+        sheet = spreadsheet.worksheet("제품주문")
+
+        # ✅ DB 시트에서 회원번호, 휴대폰번호 추출
+        db_sheet = spreadsheet.worksheet("DB")
+        member_records = db_sheet.get_all_records()
+
+        회원번호 = ""
+        회원_휴대폰번호 = ""
+        for record in member_records:
+            if record.get("회원명") == 회원명:
+                회원번호 = record.get("회원번호", "")
+                회원_휴대폰번호 = record.get("휴대폰번호", "")
+                break
+
+        # ✅ 주문 내용 시트에 삽입
+        if orders:
+            row_index = 2  # 항상 2행부터 위로 삽입
+            for order in orders:
+                row = [
+                    order.get("주문일자", datetime.now().strftime("%Y-%m-%d")),  # ✅ 주문일자 우선, 없으면 오늘
+                    회원명,
+                    회원번호,
+                    회원_휴대폰번호,
+                    order.get("제품명", ""),
+                    order.get("제품가격", ""),
+                    order.get("PV", ""),
+                    order.get("결재방법", ""),
+                    order.get("주문자_고객명", ""),
+                    order.get("주문자_휴대폰번호", ""),
+                    order.get("배송처", ""),
+                    order.get("수령확인", "")
+                ]
+                sheet.insert_row(row, row_index)
+                row_index += 1
+
+        return jsonify({"status": "success", "message": "주문이 저장되었습니다."})
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 이미지에서 추출한 제품 주문 데이터를 JSON 형식으로 받아서, Google Sheets의 "제품주문" 시트에 한 줄씩 저장하는 API입니다.
+
+# ✅ 컴퓨터에서 이미지 입력으로 제품주문처리
+
+
+def append_row_to_sheet(sheet, row):
+    sheet.append_row(row, value_input_option="USER_ENTERED")
+
+@app.route('/save_order_from_json', methods=['POST'])
+def save_order_from_json():
+    try:
+        data = request.get_json()
+        sheet = get_worksheet("제품주문")
+
+        if not isinstance(data, list):
+            return jsonify({"error": "JSON은 리스트 형식이어야 합니다."}), 400
+
+        for item in data:
+            row = [
+                "",  # 주문일자 무시
+                "",  # 회원명 무시
+                "",  # 회원번호 무시
+                "",  # 휴대폰번호 무시
+                item.get("제품명", ""),
+                item.get("제품가격", ""),
+                item.get("PV", ""),
+                "",  # 결재방법 무시
+                item.get("주문자_고객명", ""),
+                item.get("주문자_휴대폰번호", ""),
+                item.get("배송처", ""),
+                "",  # 수령확인 무시
+            ]
+            append_row_to_sheet(sheet, row)
+
+        return jsonify({"status": "success", "count": len(data)})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 음성으로 제품등록 
+
+# ✅ 날짜 파싱
+def parse_date(text):
+    today = datetime.today()
+    if "오늘" in text:
+        return today.strftime("%Y-%m-%d")
+    elif "어제" in text:
+        return (today - timedelta(days=1)).strftime("%Y-%m-%d")
+    else:
+        match = re.search(r"(20\d{2}[./-]\d{1,2}[./-]\d{1,2})", text)
+        if match:
+            return re.sub(r"[./]", "-", match.group(1))
+    return today.strftime("%Y-%m-%d")
+
+
+
+# parse_order_text() 함수는 자연어 문장에서 다음과 같은 주문 정보를 자동으로 추출하는 함수입니다:
+# 예) "김지연 노니 2개 카드로 주문 저장" →
+# → 회원명: 김지연, 제품명: 노니, 수량: 2, 결제방법: 카드
+
+# ✅ 자연어 문장 파싱
+def parse_order_text(text):
+    result = {}
+
+    # 1. 회원명
+    match = re.match(r"(\S+)(?:님)?", text)
+    if match:
+        result["회원명"] = match.group(1)
+
+    # 2. 제품명 + 수량
+    prod_match = re.search(r"([\w가-힣]+)[\s]*(\d+)\s*개", text)
+    if prod_match:
+        result["제품명"] = prod_match.group(1)
+        result["수량"] = int(prod_match.group(2))
+    else:
+        result["제품명"] = "제품"
+        result["수량"] = 1
+
+    # 3. 결제방법
+    if "카드" in text:
+        result["결재방법"] = "카드"
+    elif "현금" in text:
+        result["결재방법"] = "현금"
+    elif "계좌" in text:
+        result["결재방법"] = "계좌이체"
+    else:
+        result["결재방법"] = "카드"
+
+    # 4. 주소 or 배송지
+    address_match = re.search(r"(?:주소|배송지)[:：]\s*(.+?)(\s|$)", text)
+    if address_match:
+        result["배송처"] = address_match.group(1).strip()
+    else:
+        result["배송처"] = ""
+
+    # 5. 주문일자
+    result["주문일자"] = parse_date(text)
+
+    return result
+
+
+
+
+
+
+
+
+
+
+
+
+
+# 클라이언트로부터 주문 관련 자연어 문장을 받아서 분석(파싱)한 후, Google Sheets 같은 시트에 저장하는 역할
+# POST 요청의 JSON body에서 "text" 필드 값을 받아와 user_input 변수에 저장
+# 예: "김지연 노니 2개 카드 주문 저장" 같은 자연어 문장
+
+# ✅ API 엔드포인트
+@app.route("/parse_and_save_order", methods=["POST"])
+def parse_and_save_order():
+    try:
+        user_input = request.json.get("text", "")
+        parsed = parse_order_text(user_input)
+        save_order_to_sheet(parsed)
+        return jsonify({
+            "status": "success",
+            "message": f"{parsed['회원명']}님의 주문이 저장되었습니다.",
+            "parsed": parsed
+        })
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# ✅ 루트 확인용
+@app.route("/")
+def hello():
+    return "📦 제품주문 이미지 업로드 API 실행 중!"
 
 
 @app.route("/debug_sheet", methods=["GET"])
@@ -2628,10 +3565,7 @@ def debug_sheet():
 
 
 
-# 서버 실행
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
-
-
+    app.run(host="0.0.0.0", port=10000, debug=True)
 
 
