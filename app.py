@@ -27,6 +27,7 @@ import mimetypes
 import traceback
 
 
+from urllib.parse import urljoin
 
 
 
@@ -64,6 +65,7 @@ scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/au
 creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
 creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
 client = gspread.authorize(creds)
+
 
 # 시트 연결
 sheet = client.open(GOOGLE_SHEET_TITLE)
@@ -1503,7 +1505,25 @@ def delete_member_field_nl_internal(text, matched_fields):
 
 
 
+# 시트/DB 업데이트 함수 (샘플)
+def append_to_sheet(sheet_name, row):
+    ws = get_worksheet(sheet_name)
+    ws.append_row(row, value_input_option="USER_ENTERED")
 
+def update_member_field(member_name, field, value):
+    ws = get_worksheet("회원DB")
+    data = ws.get_all_values()
+    headers = data[0]
+    try:
+        idx_name = headers.index("회원명")
+        idx_field = headers.index(field)
+    except ValueError:
+        return False
+    for i, row in enumerate(data[1:], start=2):
+        if row[idx_name] == member_name:
+            ws.update_cell(i, idx_field + 1, value)
+            return True
+    return False
 
 
 
@@ -1512,376 +1532,130 @@ def delete_member_field_nl_internal(text, matched_fields):
 
 # 메모 저장 루틴
 # ==================================================================================
-# 환경변수에서 API_BASE 불러오기 (없으면 예외 발생)
 API_BASE = os.getenv("API_BASE")
+API_URL = os.getenv("COUNSELING_API_URL")
+HEADERS = {"Content-Type": "application/json"}
 
-# ===== 유틸 =====
+try:
+    app
+except NameError:
+    app = Flask(__name__)
+
+SHEET_KEYWORDS = {"상담일지", "개인메모", "활동일지", "회원메모", "회원주소"}
+ACTION_KEYWORDS = {"저장", "기록", "입력"}
+
+_SHEET_PAT = r"(?:상담\s*일지|개인\s*메모|활동\s*일지|회원\s*메모|회원\s*주소|상담일지|개인메모|활동일지|회원메모|회원주소)"
+_ACTION_PAT = r"(?:저장|기록|입력)"
+
 def quote_safe(text: str) -> str:
-    """요청문에 들어갈 값에서 줄바꿈/따옴표 등 최소 정제"""
     if text is None:
         return ""
     return str(text).replace("\n", " ").replace("\r", " ").strip()
 
-def _has_token(text: str, pattern: str) -> bool:
-    """
-    단어 경계 기준으로 패턴 존재 여부를 판정합니다.
-    - 공백 허용: 회원\s*메모, 개인\s*메모 등
-    - 앞뒤가 한글/영문/숫자와 붙어 있으면 매칭하지 않음 (메모 vs 메모리 구분)
-    """
-    wrapped = rf'(?<![가-힣A-Za-z0-9])(?:{pattern})(?![가-힣A-Za-z0-9])'
-    return re.search(wrapped, text) is not None
-
 def _post(path: str, payload: dict):
-    """POST 요청 공용 처리"""
-    url = f"{API_BASE}{path}"
-    r = requests.post(url, json=payload, timeout=15)
-    try:
-        r.raise_for_status()
-    except requests.HTTPError:
-        print(f"[HTTP {r.status_code}] POST {url} -> {r.text}")
-        raise
+    url = urljoin(API_BASE.rstrip('/') + '/', path.lstrip('/'))
+    r = requests.post(url, json=payload, timeout=15, headers=HEADERS)
+    r.raise_for_status()
     return r
 
-# ===== 파서 =====
-def parse_memo_intent(command: str) -> str | None:
-    """
-    메모 관련 의도 판정
-    반환: 'personal' | 'db_memo' | None
-    우선순위: 개인메모 > 회원메모/메모
-    """
-    cmd = (command or "").strip()
-
-    # 1) 개인메모
-    if _has_token(cmd, r'개인\s*메모'):
-        return 'personal'
-
-    # 2) 회원메모 또는 일반 메모 → DB '메모' 컬럼
-    if _has_token(cmd, r'회원\s*메모') or _has_token(cmd, r'메모'):
-        return 'db_memo'
-
-    return None
-
-# ===== 액션 =====
 def update_member_field(member_name, field, value):
-    """회원 DB 시트의 특정 필드 수정 (기존값 삭제 후 새 값 저장)"""
     member_name = quote_safe(member_name)
     field = quote_safe(field)
     value = quote_safe(value)
+    _post("/updateMember", {"요청문": f"{member_name} {field} ''"})
+    _post("/updateMember", {"요청문": f"{member_name} {field} {value}"})
 
-    # 기존 값 삭제
-    _post("/updateMember", {
-        "요청문": f"{member_name} {field} ''"
-    })
+def get_member_sheet():
+    return get_worksheet("DB")
 
-    # 새 값 저장
-    _post("/updateMember", {
-        "요청문": f"{member_name} {field} {value}"
-    })
+def now_str_kr():
+    tz = pytz.timezone("Asia/Seoul")
+    return datetime.now(tz).strftime("%Y-%m-%d %H:%M")
 
-def save_personal_memo(member_name, memo):
-    """개인메모 시트에 새 행 추가"""
-    member_name = quote_safe(member_name)
-    memo = quote_safe(memo)
-
-    _post("/addCounseling", {
-        "요청문": f"{member_name} 개인메모 저장 {memo}",
-        "mode": "개인",           # 서버에서 '개인메모' 시트로 라우팅
-        "sheet_name": "개인메모", # 명시적 시트 지정 (서버에서 지원할 경우)
-        "allow_unregistered": True
-    })
-
-# ===== 메인 라우팅 =====
-def process_request(member_name, command, value):
-    """명령어 해석 후 적절한 시트에 저장"""
-    intent = parse_memo_intent(command)
-
-    if intent == 'personal':
-        save_personal_memo(member_name, value)
-    elif intent == 'db_memo':
-        update_member_field(member_name, "메모", value)
-    elif re.fullmatch(r"\d{6,10}", value):  # 숫자만 → 회원번호
-        update_member_field(member_name, "회원번호", value)
-    elif re.fullmatch(r"(01\d-\d{3,4}-\d{4})|(01\d\d{7,8})", value):  # 휴대폰 번호
-        update_member_field(member_name, "휴대폰번호", value)
-    else:
-        # 그 외 필드는 그대로 DB 수정
-        update_member_field(member_name, command, value)
-
-# ===== 사용 예시 =====
-# process_request("이판사", "메모", "날씨가 좋아요")
-# process_request("이판사", "회원메모", "회비 납부 확인")
-# process_request("이판사", "개인메모", "오늘은 비가 오지 않네요.")
-# process_request("홍길동", "아무거나", "123456")          # 회원번호 필드
-# process_request("홍길동", "아무거나", "010-1234-5678")   # 휴대폰번호 필드
-
-
-
-
-
-
-def extract_nouns(text):
-    return re.findall(r'[가-힣]{2,}', text)
-
-def generate_tags(text):
-    nouns = extract_nouns(text)
-    top_keywords = [word for word, _ in Counter(nouns).most_common(5)]
-    return top_keywords
-
-
-
-API_URL = os.getenv("COUNSELING_API_URL")
-
-HEADERS = {"Content-Type": "application/json"}
-
-def determine_mode(content: str) -> str:
-    if "상담일지" in content:
-        return "1"  # 상담일지 (공유)
-    elif "개인메모" in content:
-        return "개인"
-    elif "활동일지" in content:
-        return "3"
-    else:
-        return "1"  # 기본값
-
-
-
-
-
-
-
-
-
-
-@app.route('/save_note', methods=['POST'])
-def save_note():
-    data = request.json
-    요청문 = data.get("요청문", "")
-    mode = determine_mode(요청문)
-
-    payload = {
-        "요청문": 요청문,
-        "mode": mode,
-        "allow_unregistered": True
-    }
-
-    response = requests.post(API_URL, json=payload, headers=HEADERS)
-    if response.ok:
-        return jsonify({"status": "success", "message": "저장 완료"})
-    else:
-        return jsonify({"status": "error", "message": response.text})
-        
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# 메모 저장 루틴
-# ==================================================================================
-
-# save_to_sheet(sheet_name, member_name, content)로 호출되며,
-# Google Sheets의 특정 시트에 상담일지 / 개인메모 / 활동일지 등을 저장하는 공통 함수입니다.
-
-# ✅ 시트 저장 함수 (Google Sheets 연동 및 중복 확인)
-def save_to_sheet(sheet_name, member_name, content):
-    try:
-        sheet = get_worksheet(sheet_name)
-        if sheet is None:
-            print(f"[오류] '{sheet_name}' 시트를 찾을 수 없습니다.")
-            return False
-
-        existing = sheet.get_all_values()
-        contents = [row[2] if len(row) > 2 else "" for row in existing]  # 내용은 3열 기준
-        if content in contents:
-            print(f"[중복] 이미 같은 내용이 '{sheet_name}'에 존재합니다.")
-            return False
-
-        now = datetime.now(pytz.timezone("Asia/Seoul"))
-        time_str = now.strftime("%Y-%m-%d %H:%M")
-
-        clean_name = re.sub(r"[^\w가-힣]", "", member_name.strip())
-        clean_content = content.strip()
-        sheet.insert_row([time_str.strip(), clean_name, clean_content], index=2)
-
-
-        print(f"[저장완료] '{sheet_name}' 시트에 저장 완료")
-        return True
-
-    except Exception as e:
-        print(f"[시트 저장 오류: {sheet_name}] {e}")
+def update_member_field_strict(member_name: str, field_name: str, value: str) -> bool:
+    sheet = get_member_sheet()
+    headers = [h.strip() for h in sheet.row_values(1)]
+    if "회원명" not in headers:
+        raise RuntimeError("DB 시트에 '회원명' 헤더가 없습니다.")
+    if field_name not in headers:
+        raise RuntimeError(f"DB 시트에 '{field_name}' 헤더가 없습니다.")
+    values = sheet.get_all_values()
+    member_col = headers.index("회원명") + 1
+    field_col = headers.index(field_name) + 1
+    target_row = None
+    for i, row in enumerate(values[1:], start=2):
+        if len(row) >= member_col and row[member_col - 1] == member_name:
+            target_row = i
+            break
+    if target_row is None:
         return False
+    return bool(safe_update_cell(sheet, target_row, field_col, value, clear_first=True))
 
+def save_to_sheet(sheet_name: str, member_name: str, content: str) -> bool:
+    sheet = get_worksheet(sheet_name)
+    if sheet is None:
+        raise RuntimeError(f"'{sheet_name}' 시트를 찾을 수 없습니다.")
+    ts = now_str_kr()
+    sheet.insert_row([ts, (member_name or "").strip(), (content or "").strip()], index=2)
+    return True
 
+def parse_request_line(text: str):
+    if not text or not text.strip():
+        return None, None, None, None
+    s = text.strip()
+    m = re.match(rf"^\s*(\S+)\s+({_SHEET_PAT})\s+({_ACTION_PAT})\s*(.*)$", s)
+    if m:
+        member_name, sheet_keyword_raw, action_keyword, content = m.groups()
+        sheet_keyword = sheet_keyword_raw.replace(" ", "")
+    else:
+        parts = s.split(maxsplit=3)
+        if len(parts) < 3:
+            return None, None, None, None
+        member_name, sheet_keyword, action_keyword = parts[0], parts[1], parts[2]
+        content = parts[3] if len(parts) > 3 else ""
+        sheet_keyword = sheet_keyword.replace(" ", "")
+    if sheet_keyword not in SHEET_KEYWORDS:
+        return member_name, None, action_keyword, content
+    if action_keyword not in ACTION_KEYWORDS:
+        return member_name, sheet_keyword, None, content
+    return member_name, sheet_keyword, action_keyword, content
 
-
-
-
-def clean_request_text(text):
-    return ' '.join(text.replace("회원", "").split())
-
-
-@app.route('/add_counseling', methods=['POST'])
-def add_counseling():
+@app.route("/save_note_unified", methods=["POST"])
+def save_note_unified():
     try:
-        data = request.get_json()
-        text = data.get("요청문", "").replace(".", "").strip()
-
-        # ✅ 키워드 정규화
-        replacements = {
-            "개인 메모": "개인메모", "상담 일지": "상담일지",
-            "활동 일지": "활동일지", "회원 메모": "회원메모",
-            "제품 주문": "제품주문", "회원 주소": "회원주소"
-        }
-        for k, v in replacements.items():
-            text = text.replace(k, v)
-
-        sheet_keywords = ["상담일지", "개인메모", "활동일지", "직접입력", "회원메모", "제품주문", "회원주소"]
-        action_keywords = ["저장", "기록", "입력"]
-
-
-
-        if "전체메모" in text and "검색" in text:
-            return search_all_memo_by_text_from_natural()
-
-
-
-
-        # ✅ 🔽 검색 요청 분기 추가
-        if "개인메모" in text and "검색" in text:
-            return search_memo_by_text_from_natural(text)
-
-
-
-        if "상담일지" in text and "검색" in text:
-            return search_counseling_by_text_from_natural(text)
-        
-
-
-        if "활동일지" in text and "검색" in text:
-            return search_activity_by_text_from_natural(text)
-
-
-
-
-
-        # ✅ 유효성 검사
-        if not any(kw in text for kw in sheet_keywords) or not any(kw in text for kw in action_keywords):
-            return jsonify({
-                "message": "저장하려면 '상담일지', '개인메모', '활동일지', '회원메모', '제품주문', '회원주소' 중 하나와 '저장', '기록', '입력' 같은 동작어를 포함해 주세요."
-            })
-
-
-
-        # ✅ 회원명 추출 (ex: "이태수 상담일지 저장...")
-        
-        match = re.search(r"([가-힣]{2,4})\s*(상담일지|개인메모|활동일지|직접입력|회원메모|제품주문|회원주소)", text)
-
-
-
-        if not match:
-            return jsonify({"message": "회원명을 인식할 수 없습니다."})
-        member_name = match.group(1)
-
-        # ✅ 시트 키워드 추출
-        matched_sheet = next((kw for kw in sheet_keywords if kw in text), None)
-        if not matched_sheet:
-            return jsonify({"message": "저장할 시트를 인식할 수 없습니다."})
-        
-
-        # ✅ 불필요한 키워드 제거
-        for kw in [member_name] + sheet_keywords + action_keywords:
-            text = text.replace(kw, "")
-        text = text.strip()
-        text = re.sub(r'^[:：]\s*', '', text)
-
-
-
-        # ✅ 제품주문 처리 분기
-        if matched_sheet == "제품주문":
-            return handle_product_order(text, member_name)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        # ✅ DB 시트 필드 업데이트 함수
-        def update_member_field(field_name, value, member_name):
-            sheet = get_member_sheet()
-            db = sheet.get_all_records()
-            headers = [h.strip().lower() for h in sheet.row_values(1)]
-            matching_rows = [i for i, row in enumerate(db) if row.get("회원명") == member_name]
-            if not matching_rows:
-                return jsonify({"message": f"'{member_name}' 회원을 찾을 수 없습니다."})
-
-            row_index = matching_rows[0] + 2
-            if field_name.lower() in headers:
-                col_index = headers.index(field_name.lower()) + 1
-
-                success = safe_update_cell(sheet, row_index, col, value, clear_first=True)
-
-                if success:
-                    return jsonify({"message": f"{member_name}님의 {field_name}이(가) DB 시트에 저장되었습니다."})
-                else:
-                    return jsonify({"message": f"'{member_name}' {field_name} 저장 실패 (safe_update_cell 실패)."})
+        data = request.get_json(force=True)
+        raw = data.get("요청문", "")
+        member_name, sheet_keyword, action_keyword, content = parse_request_line(raw)
+        if not member_name:
+            return jsonify({"ok": False, "message": "형식 오류: 첫 단어에 회원명을 입력하세요."}), 400
+        if not sheet_keyword:
+            return jsonify({"ok": False, "message": "형식 오류: 두 번째 단어가 유효한 시트키워드가 아닙니다.", "허용": sorted(SHEET_KEYWORDS)}), 400
+        if not action_keyword:
+            return jsonify({"ok": False, "message": "형식 오류: 세 번째 단어에 '저장/기록/입력' 중 하나를 입력하세요.", "허용": sorted(ACTION_KEYWORDS)}), 400
+        if sheet_keyword in {"상담일지", "개인메모", "활동일지"}:
+            ok = save_to_sheet(sheet_keyword, member_name, content)
+            if ok:
+                return jsonify({"ok": True, "message": f"{member_name}님의 {sheet_keyword} 저장 완료."}), 200
             else:
-                return jsonify({"message": f"'{field_name}' 필드가 시트에 존재하지 않습니다."})
-
-
-
-
-        if matched_sheet == "회원메모":
-            member_name = extract_member_name(text)
-            return update_member_field("메모", text, member_name)
-
-
-        if matched_sheet == "회원주소":
-            return update_member_field("주소", text)
-
-
-
-
-
-        # ✅ 상담일지, 개인메모, 활동일지 시트 저장
-        if matched_sheet in ["상담일지", "개인메모", "활동일지"]:
-            if save_to_sheet(matched_sheet, member_name, text):
-                return jsonify({"message": f"{member_name}님의 {matched_sheet} 저장이 완료되었습니다."})
-            else:
-                return jsonify({"message": f"같은 내용이 이미 '{matched_sheet}' 시트에 저장되어 있습니다."})
-
-        return jsonify({"message": "처리할 수 없는 시트입니다."})
-
-
-
-
+                return jsonify({"ok": False, "message": f"{sheet_keyword}에 동일 내용이 이미 존재합니다."}), 409
+        elif sheet_keyword == "회원메모":
+            ok = update_member_field_strict(member_name, "메모", content)
+            if not ok:
+                return jsonify({"ok": False, "message": f"'{member_name}' 회원을 찾을 수 없습니다."}), 404
+            return jsonify({"ok": True, "message": f"{member_name}님의 메모가 DB에 저장되었습니다."}), 200
+        elif sheet_keyword == "회원주소":
+            ok = update_member_field_strict(member_name, "주소", content)
+            if not ok:
+                return jsonify({"ok": False, "message": f"'{member_name}' 회원을 찾을 수 없습니다."}), 404
+            return jsonify({"ok": True, "message": f"{member_name}님의 주소가 DB에 저장되었습니다."}), 200
+        else:
+            return jsonify({"ok": False, "message": f"처리할 수 없는 시트키워드: {sheet_keyword}"}), 400
     except Exception as e:
         import traceback
         traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+
 
     
 
@@ -3537,6 +3311,15 @@ def parse_and_save_order():
 
 
 
+
+
+
+
+
+
+
+
+
 # ✅ 루트 확인용
 @app.route("/")
 def hello():
@@ -3548,6 +3331,9 @@ def debug_sheet():
     sheet = get_mymemo_sheet()
     values = sheet.get_all_values()
     return jsonify(values), 200
+
+
+
 
 
 
