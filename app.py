@@ -70,17 +70,17 @@ client = gspread.authorize(creds)
 
 
 def get_gspread_client():
-    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
-    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-    client = gspread.authorize(creds)
+    creds_json = os.getenv("GOOGLE_CREDENTIALS_JSON")  # Render에서 환경변수로 넣은 값
+    if creds_json:  # Render 환경
+        creds_dict = json.loads(creds_json)
+        creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+    else:  # 로컬 개발용 (credentials.json 파일 사용)
+        creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+        creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
 
-    # 타임아웃 강제 세션 (기본은 무한 대기)
-    client.session = AuthorizedSession(creds)
-    client.session.timeout = 10   # 10초 넘어가면 에러 발생
-
-    return client
+    return gspread.authorize(creds)
 
 
 
