@@ -67,6 +67,24 @@ creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
 client = gspread.authorize(creds)
 
 
+
+
+def get_gspread_client():
+    creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+    scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+
+    creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
+    client = gspread.authorize(creds)
+
+    # 타임아웃 강제 세션 (기본은 무한 대기)
+    client.session = AuthorizedSession(creds)
+    client.session.timeout = 10   # 10초 넘어가면 에러 발생
+
+    return client
+
+
+
+
 # 시트 연결
 sheet = client.open(GOOGLE_SHEET_TITLE)
 print(f"시트 '{GOOGLE_SHEET_TITLE}'에 연결되었습니다.")
@@ -107,22 +125,6 @@ def some_function():
 # ✅ 확인용 출력 (선택)
 print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -308,21 +310,6 @@ def find_member():
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 def safe_update_cell(sheet, row, col, value, clear_first=True, max_retries=3, delay=2):
     """
     시트 셀을 안전하게 업데이트합니다.
@@ -367,13 +354,6 @@ def clean_value_expression(text: str) -> str:
         pattern = rf'({p})\s*$'
         text = re.sub(pattern, '', text)
     return text.strip()
-
-
-
-
-
-
-
 
 
 
