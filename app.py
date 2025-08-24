@@ -179,10 +179,10 @@ def get_counseling_sheet():
     return get_worksheet("상담일지")
 
 def get_mymemo_sheet():
-    return get_worksheet("개인메모")
+    return get_worksheet("개인일지")
 
 def get_search_memo_by_tags_sheet():
-    return get_worksheet("개인메모")
+    return get_worksheet("개인밀지")
 
 def get_dailyrecord_sheet():
     return get_worksheet("활동일지")
@@ -1495,10 +1495,10 @@ try:
 except NameError:
     app = Flask(__name__)
 
-SHEET_KEYWORDS = {"상담일지", "개인메모", "활동일지", "회원메모", "회원주소"}
+SHEET_KEYWORDS = {"상담일지", "개인일지", "활동일지", "회원메모", "회원주소"}
 ACTION_KEYWORDS = {"저장", "기록", "입력"}
 
-_SHEET_PAT = r"(?:상담\s*일지|개인\s*메모|활동\s*일지|회원\s*메모|회원\s*주소|상담일지|개인메모|활동일지|회원메모|회원주소)"
+_SHEET_PAT = r"(?:상담\s*일지|개인\s*메모|활동\s*일지|회원\s*메모|회원\s*주소|상담일지|개인일지|활동일지|회원메모|회원주소)"
 _ACTION_PAT = r"(?:저장|기록|입력)"
 
 def quote_safe(text: str) -> str:
@@ -1586,7 +1586,7 @@ def save_note_unified():
             return jsonify({"ok": False, "message": "형식 오류: 두 번째 단어가 유효한 시트키워드가 아닙니다.", "허용": sorted(SHEET_KEYWORDS)}), 400
         if not action_keyword:
             return jsonify({"ok": False, "message": "형식 오류: 세 번째 단어에 '저장/기록/입력' 중 하나를 입력하세요.", "허용": sorted(ACTION_KEYWORDS)}), 400
-        if sheet_keyword in {"상담일지", "개인메모", "활동일지"}:
+        if sheet_keyword in {"상담일지", "개인일지", "활동일지"}:
             ok = save_to_sheet(sheet_keyword, member_name, content)
             if ok:
                 return jsonify({"ok": True, "message": f"{member_name}님의 {sheet_keyword} 저장 완료."}), 200
@@ -1691,7 +1691,7 @@ def search_memo_by_text():
 
 # ✅ 자연어 텍스트에서 키워드 추출 및 매칭 방식 자동 판단
 def run_memo_search_from_natural_text(text):
-    ignore_words = ["개인메모", "검색", "에서", "해줘", "해", "줘"]
+    ignore_words = ["개인일지", "검색", "에서", "해줘", "해", "줘"]
     words = [kw for kw in text.split() if kw not in ignore_words]
 
     if not words:
@@ -1979,7 +1979,7 @@ def run_all_memo_search_from_natural_text(text):
     }
 
     with app.test_client() as client:
-        개인메모 = client.post("/search_memo_by_text", json=payload)
+        개인일지 = client.post("/search_memo_by_text", json=payload)
         활동일지 = client.post("/search_activity_by_text_from_natural", json=payload)
         상담일지 = client.post("/search_counseling_by_text_from_natural", json=payload)
 
@@ -1994,7 +1994,7 @@ def run_all_memo_search_from_natural_text(text):
 
     result_lines = []
 
-    for label, res in [("개인메모", 개인메모), ("활동일지", 활동일지), ("상담일지", 상담일지)]:
+    for label, res in [("개인일지", 개인일지), ("활동일지", 활동일지), ("상담일지", 상담일지)]:
         result_lines.append(f"=== {label} ===")
         for r in extract_results(res):
             result_lines.append(f"{r['날짜']} {r['회원명']} {r['내용']}")
