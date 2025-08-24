@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 import base64
 import requests
 import os
@@ -19,22 +19,10 @@ from gspread.utils import rowcol_to_a1
 from collections import Counter
 
 import time
-from flask import  Response
 from PIL import Image
-
 import mimetypes
-
 import traceback
-
-
 from urllib.parse import urljoin
-
-
-
-
-
-
-
 
 
 # ✅ 환경 변수 로드
@@ -60,15 +48,8 @@ OPENAI_API_URL = os.getenv("OPENAI_API_URL")
 # ✅ memberslist API 엔드포인트
 MEMBERSLIST_API_URL = os.getenv("MEMBERSLIST_API_URL")
 
-# ✅ Google Sheets 전역 클라이언트 초기화
-scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
-creds = ServiceAccountCredentials.from_json_keyfile_name(creds_path, scope)
-client = gspread.authorize(creds)
 
-
-
-
+# ✅ Google Sheets 클라이언트 생성 함수
 def get_gspread_client():
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
@@ -83,9 +64,8 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 
-
-
-# 시트 연결
+# ✅ 시트 연결
+client = get_gspread_client()
 sheet = client.open(GOOGLE_SHEET_TITLE)
 print(f"시트 '{GOOGLE_SHEET_TITLE}'에 연결되었습니다.")
 
@@ -112,10 +92,6 @@ def get_worksheet(sheet_name):
     return client.open(GOOGLE_SHEET_TITLE).worksheet(sheet_name)
 
 
-
-
-
-
 def some_function():
     print("작업 시작")
     time.sleep(1)
@@ -125,8 +101,6 @@ def some_function():
 # ✅ 확인용 출력 (선택)
 print("✅ GOOGLE_SHEET_TITLE:", os.getenv("GOOGLE_SHEET_TITLE"))
 print("✅ GOOGLE_SHEET_KEY 존재 여부:", "Yes" if os.getenv("GOOGLE_SHEET_KEY") else "No")
-
-
 
 
 
