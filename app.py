@@ -3266,33 +3266,6 @@ def parse_and_save_order():
 
 
 
-
-
-
-
-
-
-
-
-# ✅ 루트 확인용
-@app.route("/")
-def hello():
-    return "📦 제품주문 이미지 업로드 API 실행 중!"
-
-
-@app.route("/debug_sheet", methods=["GET"])
-def debug_sheet():
-    sheet = get_mymemo_sheet()
-    values = sheet.get_all_values()
-    return jsonify(values), 200
-
-
-
-
-
-
-
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000, debug=True)
 
