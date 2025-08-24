@@ -1,23 +1,23 @@
 Host github-boraminfo
     HostName github.com
     User git
-    IdentityFile C:\ChatGPT\/id_ed25519_boraminfo          
+    IdentityFile C:/ChatGPT/id_ed25519_boraminfo
     IdentitiesOnly yes
 
 Host github-ehlhappyday
     HostName github.com
     User git
-    IdentityFile C:\ChatGPT\/id_ed25519_ehlhappyday
+    IdentityFile C:/ChatGPT/id_ed25519_ehlhappyday
     IdentitiesOnly yes
 
-Host github-sohee4463
+Host github-iamsohappy0418
     HostName github.com
     User git
-    IdentityFile C:\ChatGPT\/id_ed25519_sohee4463
+    IdentityFile C:/ChatGPT/id_ed25519_iamsohappy0418
     IdentitiesOnly yes
 
 Host github-boraminfo
     HostName github.com
     User git
     IdentityFile C:/ChatGPT/id_ed25519_boraminfo
-
+    IdentitiesOnly yes
