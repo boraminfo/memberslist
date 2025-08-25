@@ -1556,21 +1556,9 @@ def save_to_sheet(sheet_name: str, member_name: str, content: str) -> bool:
         raise RuntimeError(f"'{sheet_name}' 시트를 찾을 수 없습니다.")
 
     ts = now_str_kr()
-    today_str = ts.split(" ")[0]  # ✅ 날짜만 추출 (YYYY-MM-DD)
-
-    # ✅ 기존 데이터 확인 (회원명 + 내용 + 같은 날짜면 중복)
-    values = sheet.get_all_values()
-    for row in values[1:]:  # 첫 줄은 헤더 제외
-        if len(row) >= 3:
-            date_str, m_name, m_content = row[0], row[1], row[2]
-            date_only = date_str.split(" ")[0] if date_str else ""
-            if m_name == member_name and m_content.strip() == content.strip() and date_only == today_str:
-                print(f"⚠️ 중복된 메모 발견 → 저장하지 않음 ({member_name}, {content}, {today_str})")
-                return False
-
-    # ✅ 새로운 행 삽입
     sheet.insert_row([ts, (member_name or "").strip(), (content or "").strip()], index=2)
     return True
+
 
 
 
