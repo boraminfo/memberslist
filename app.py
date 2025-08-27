@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, url_for, Response
+from flask import Flask, request, jsonify, Response
 import base64
 import requests
 import os
@@ -1677,6 +1677,9 @@ def add_counseling():
 # ======================================================================
 # 메모 검색 (개인/상담/활동/전체)
 # ======================================================================
+# ======================================================================
+# 메모 검색 (개인/상담/활동/전체)
+# ======================================================================
 SHEET_MAP = {
     "개인": "개인일지",
     "상담": "상담일지",
@@ -1811,28 +1814,10 @@ def search_memo():
         }
         if more_map:
             resp["more_results"] = {k: "더 많은 결과가 있습니다." for k in more_map}
-
-
-
-        # ✅ PDF 다운로드 안내 (POST 방식)
-        resp["download_pdf"] = {
-            "message": "검색 결과를 PDF로 다운로드하려면, 아래 URL로 같은 JSON을 POST하세요.",
-            "url": url_for("search_memo_pdf", _external=True),
-            "method": "POST",
-            "body": data
-        }
-
-
         return jsonify(resp), 200
     except Exception as e:
         import traceback; traceback.print_exc()
         return jsonify({"error": str(e)}), 500
-
-
-
-
-
-
 
 
 @app.route("/search_memo_from_text", methods=["POST"])
@@ -1907,97 +1892,7 @@ def run_all_memo_search_from_natural_text(text: str):
 
 
 
-from io import BytesIO
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
 
-
-@app.route("/search_memo_pdf", methods=["POST"])
-def search_memo_pdf():
-    """
-    POST /search_memo_pdf
-    요청 JSON은 /search_memo 와 동일
-    """
-    try:
-        req_data = request.get_json(silent=True) or {}
-        page = max(int(req_data.get("page", 1)), 1)
-        page_size = int(req_data.get("page_size", 20))
-
-        # ✅ 내부적으로 /search_memo 실행
-        with app.test_request_context(json=req_data):
-            resp, status = search_memo()
-            if status != 200:
-                return resp, status
-            data = resp.get_json()
-
-        # ✅ PDF 생성
-        buffer = BytesIO()
-        doc = SimpleDocTemplate(buffer, pagesize=A4)
-        styles = getSampleStyleSheet()
-        story = []
-
-        story.append(Paragraph("📑 메모 검색 결과", styles["Title"]))
-        story.append(Spacer(1, 12))
-
-        search_params = data.get("search_params", {})
-        cond_text = ", ".join(f"{k}: {v}" for k, v in search_params.items() if v)
-        story.append(Paragraph(f"<b>검색 조건:</b> {cond_text}", styles["Normal"]))
-        story.append(Paragraph(f"<b>페이지:</b> {page} / 페이지당 {page_size}개", styles["Normal"]))
-        story.append(Spacer(1, 20))
-
-        results = data.get("results", {})
-        for section, rows in results.items():
-            story.append(Paragraph(f"=== {section} ===", styles["Heading2"]))
-            story.append(Spacer(1, 6))
-
-            if not rows:
-                story.append(Paragraph("검색 결과 없음", styles["Normal"]))
-                story.append(Spacer(1, 12))
-                continue
-
-            # ✅ 페이지네이션 적용
-            start_idx = (page - 1) * page_size
-            end_idx = start_idx + page_size
-            paged_rows = rows[start_idx:end_idx]
-
-            table_data = [["작성일자", "회원명", "내용"]]
-            for r in paged_rows:
-                table_data.append([
-                    r.get("작성일자", ""),
-                    r.get("회원명", ""),
-                    r.get("내용", "")
-                ])
-
-            table = Table(table_data, colWidths=[100, 80, 300])
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0, 0), (-1, 0), colors.lightblue),
-                ("TEXTCOLOR", (0, 0), (-1, 0), colors.whitesmoke),
-                ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                ("FONTSIZE", (0, 0), (-1, 0), 10),
-                ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ]))
-            story.append(table)
-            story.append(Spacer(1, 20))
-
-        doc.build(story)
-        pdf_data = buffer.getvalue()
-        buffer.close()
-
-        return (
-            pdf_data,
-            200,
-            {
-                "Content-Type": "application/pdf",
-                "Content-Disposition": f"attachment; filename=search_memo_p{page}.pdf",
-            },
-        )
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        return jsonify({"error": str(e)}), 500
 
 
 
