@@ -772,6 +772,11 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             값 = tokens[i + 1]
             if 키워드 in 필드맵:
                 필드 = 필드맵[키워드]
+
+                # ✅ "삭제"라는 값은 공란 처리
+                if 값.strip() == "삭제":
+                    값 = ""
+
                 member[필드] = 값
                 member[f"{필드}_기록"] = f"(기록됨: {값})"
                 수정된필드[필드] = 값
