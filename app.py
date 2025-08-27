@@ -355,58 +355,52 @@ def update_member():
         if not 요청문:
             return jsonify({"error": "요청문이 비어 있습니다."}), 400
 
-
         # ✅ 회원 전체 삭제 감지
         if "삭제" in 요청문:
-        sheet = get_member_sheet()
-        db = sheet.get_all_records()
-        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
+            sheet = get_member_sheet()
+            db = sheet.get_all_records()
+            member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
 
-        name = None
-        for candidate in sorted(member_names, key=lambda x: -len(x)):
-            if candidate in 요청문:
-                name = candidate
-                break
+            name = None
+            for candidate in sorted(member_names, key=lambda x: -len(x)):
+                if candidate in 요청문:
+                    name = candidate
+                    break
 
-        if not name:
-            return jsonify({"error": "삭제할 회원명을 찾을 수 없습니다."}), 400
+            if not name:
+                return jsonify({"error": "삭제할 회원명을 찾을 수 없습니다."}), 400
 
-        # 👉 요청문에 필드명이 같이 들어 있으면 전체삭제가 아님
-        field_keywords = {"주소", "휴대폰번호", "회원번호", "특수번호", "가입일자", "생년월일",
-                        "통신사", "친밀도", "근무처", "계보도", "소개한분", "메모", "코드"}
+            # 👉 요청문에 필드명이 같이 들어 있으면 전체삭제가 아님
+            field_keywords = {
+                "주소", "휴대폰번호", "회원번호", "특수번호", "가입일자", "생년월일",
+                "통신사", "친밀도", "근무처", "계보도", "소개한분", "메모", "코드"
+            }
 
-        if any(field in 요청문 for field in field_keywords):
-            # 🔥 기존: 에러 반환 → 변경: updateMember 실행
-            요청문 = re.sub(r"삭제$", "비움", 요청문.strip())  # 안전하게 치환
-            return updateMember({"요청문": 요청문})
+            if any(field in 요청문 for field in field_keywords):
+                # 🔥 기존: 에러 반환 → 변경: updateMember 실행
+                import re
+                요청문 = re.sub(r"삭제$", "비움", 요청문.strip())  # 끝에 오는 '삭제'만 안전하게 치환
+                return updateMember({"요청문": 요청문})
 
-        # 👉 전체삭제는 '회원명 + 삭제' 두 단어일 때만 진행
-        tokens = 요청문.replace(",", " ").split()
-        if len(tokens) == 2 and tokens[0] == name and tokens[1] == "삭제":
-            return delete_member_direct(name)
+            # 👉 전체삭제는 '회원명 + 삭제' 두 단어일 때만 진행
+            tokens = 요청문.replace(",", " ").split()
+            if len(tokens) == 2 and tokens[0] == name and tokens[1] == "삭제":
+                return delete_member_direct(name)
 
-        return jsonify({
-            "message": "회원 전체 삭제는 '회원명 삭제' 형식으로만 가능합니다."
-        }), 400
+            return jsonify({
+                "message": "회원 전체 삭제는 '회원명 삭제' 형식으로만 가능합니다."
+            }), 400
 
-
-
-
-
-
+        # ✅ 여기서부터 일반 updateMember 로직
         sheet = get_member_sheet()
         db = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
 
-
-
-     
         member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
+
         # ✅ 계보도 대상자 추출
         lineage_match = re.search(r"계보도[를은는]?\s*([가-힣]{2,})\s*(좌측|우측|라인|왼쪽|오른쪽)", 요청문)
         계보도_대상 = lineage_match.group(1) if lineage_match else None
-
-
 
         # 회원명 찾기
         name = None
@@ -426,31 +420,18 @@ def update_member():
         row_index = matching_rows[0] + 2
         member = db[matching_rows[0]]
 
-
-        
         # ✅ 계보도 등 모든 필드는 parse_request_and_update 에서만 처리
         수정된필드 = {}
-        # 수정
         updated_member, 수정된필드 = parse_request_and_update(요청문, member)
         print("[🧪 디버그] 수정된 필드:", 수정된필드)
-
-
-
-
-
-
-
 
         수정결과 = []
         # 수정된 필드만 순회
         for key, value in 수정된필드.items():
             if key.strip().lower() in headers:
                 col = headers.index(key.strip().lower()) + 1
-
                 print(f"[⬆️ 저장 시도] row={row_index}, col={col}, value={value}")
-
                 success = safe_update_cell(sheet, row_index, col, value, clear_first=True)
-
                 if success:
                     수정결과.append({"필드": key, "값": value})
 
@@ -460,6 +441,7 @@ def update_member():
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
 
 
 
