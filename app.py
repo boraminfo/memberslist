@@ -3088,6 +3088,7 @@ def append_row_to_sheet(sheet, row):
     sheet.append_row(row, value_input_option="USER_ENTERED")
 
 @app.route('/save_order_from_json', methods=['POST'])
+
 def save_order_from_json():
     try:
         data = request.get_json()
@@ -3120,6 +3121,37 @@ def save_order_from_json():
 
 
 
+@app.route('/saveOrder', methods=['POST'])
+def save_order():
+    try:
+        data = request.get_json()
+
+        if not isinstance(data, dict):
+            return jsonify({"error": "JSON은 딕셔너리 형식이어야 합니다."}), 400
+
+        sheet = get_worksheet("제품주문")
+
+        row = [
+            data.get("주문일자", ""),           # 주문일자
+            data.get("회원명", ""),             # 회원명
+            "",                                 # 회원번호 (자동화 예정 시 공란)
+            "",                                 # 휴대폰번호 (회원 DB 연결 예정 시 공란)
+            data.get("제품명", ""),             # 제품명
+            data.get("제품가격", ""),           # 제품가격
+            data.get("PV", ""),                 # PV
+            data.get("결재방법", ""),           # 결제방법
+            data.get("주문자_고객명", ""),      # 주문자 이름
+            data.get("주문자_휴대폰번호", ""),  # 주문자 번호
+            data.get("배송지_주소", "") or data.get("배송처", ""),  # 배송주소
+            data.get("수령확인", ""),           # 수령확인 여부
+        ]
+
+        append_row_to_sheet(sheet, row)
+
+        return jsonify({"status": "success", "saved": data}), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 
