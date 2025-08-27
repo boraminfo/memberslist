@@ -355,6 +355,30 @@ def update_member():
         if not 요청문:
             return jsonify({"error": "요청문이 비어 있습니다."}), 400
 
+
+# ✅ 회원 삭제 요청 감지 (회원 전체 삭제)
+        if "삭제" in 요청문:
+            sheet = get_member_sheet()
+            db = sheet.get_all_records()
+            member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
+
+            name = None
+            for candidate in sorted(member_names, key=lambda x: -len(x)):
+                if candidate in 요청문:
+                    name = candidate
+                    break
+
+            if not name:
+                return jsonify({"error": "삭제할 회원명을 찾을 수 없습니다."}), 400
+
+            # ✅ 회원 삭제 실행
+            return delete_member_direct(name)
+
+
+
+
+
+
         sheet = get_member_sheet()
         db = sheet.get_all_records()
         headers = [h.strip() for h in sheet.row_values(1)]
@@ -1254,23 +1278,16 @@ def save_memo():
 
 
 
-
-
-
-
-
+# ✅ 회원 삭제 공통 로직 (update_member에서도 호출 가능)
 # ==========================================================================
 # ✅ 회원 삭제 API (안전 확인 포함)
 # ==========================================================================
 # ✅ 회원 삭제 API
-@app.route('/delete_member', methods=['POST'])
-def delete_member():
+def delete_member_direct(name: str):
     try:
-        name = request.get_json().get("회원명")
         if not name:
             return jsonify({"error": "회원명을 입력해야 합니다."}), 400
 
-        # DB 시트
         sheet = get_member_sheet()
         data = sheet.get_all_records()
 
@@ -1289,8 +1306,16 @@ def delete_member():
         return jsonify({"error": f"'{name}' 회원을 찾을 수 없습니다."}), 404
 
     except Exception as e:
+        import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500
+
+
+@app.route('/delete_member', methods=['POST'])
+def delete_member():
+    name = request.get_json().get("회원명")
+    return delete_member_direct(name)
+
 
 
 
