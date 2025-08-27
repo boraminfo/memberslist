@@ -64,10 +64,16 @@ def get_gspread_client():
     return gspread.authorize(creds)
 
 
+
 # ✅ 시트 연결
 client = get_gspread_client()
-sheet = client.open(GOOGLE_SHEET_TITLE)
-print(f"시트 '{GOOGLE_SHEET_TITLE}'에 연결되었습니다.")
+SHEET_KEY = os.getenv("GOOGLE_SHEET_KEY")
+if not SHEET_KEY:
+    raise EnvironmentError("환경변수 GOOGLE_SHEET_KEY가 설정되지 않았습니다.")
+spreadsheet = client.open_by_key(SHEET_KEY)
+print(f"시트에 연결되었습니다. (ID={SHEET_KEY})")
+
+
 
 # ✅ 필수 환경 변수 확인
 if not GOOGLE_SHEET_TITLE:
@@ -87,9 +93,6 @@ def now_kst():
 # ✅ Flask 초기화
 app = Flask(__name__)
 
-
-# 전역에서 한 번만 open
-spreadsheet = client.open(GOOGLE_SHEET_TITLE)
 
 def get_worksheet(sheet_name):
     try:
@@ -3122,36 +3125,16 @@ def save_order_from_json():
 
 
 @app.route('/saveOrder', methods=['POST'])
-def save_order():
+@app.route('/save_Order', methods=['POST'])
+def saveOrder():
     try:
-        data = request.get_json()
-
-        if not isinstance(data, dict):
-            return jsonify({"error": "JSON은 딕셔너리 형식이어야 합니다."}), 400
-
-        sheet = get_worksheet("제품주문")
-
-        row = [
-            data.get("주문일자", ""),           # 주문일자
-            data.get("회원명", ""),             # 회원명
-            "",                                 # 회원번호 (자동화 예정 시 공란)
-            "",                                 # 휴대폰번호 (회원 DB 연결 예정 시 공란)
-            data.get("제품명", ""),             # 제품명
-            data.get("제품가격", ""),           # 제품가격
-            data.get("PV", ""),                 # PV
-            data.get("결재방법", ""),           # 결제방법
-            data.get("주문자_고객명", ""),      # 주문자 이름
-            data.get("주문자_휴대폰번호", ""),  # 주문자 번호
-            data.get("배송지_주소", "") or data.get("배송처", ""),  # 배송주소
-            data.get("수령확인", ""),           # 수령확인 여부
-        ]
-
-        append_row_to_sheet(sheet, row)
-
-        return jsonify({"status": "success", "saved": data}), 200
-
+        payload = request.get_json(force=True)
+        resp = requests.post(MEMBERSLIST_API_URL, json=payload)
+        resp.raise_for_status()
+        return jsonify(resp.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 
 
