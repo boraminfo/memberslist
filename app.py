@@ -773,10 +773,7 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             if 키워드 in 필드맵:
                 필드 = 필드맵[키워드]
 
-                # ✅ "삭제"라는 값은 공란 처리
-                if 값.strip() == "삭제":
-                    값 = ""
-
+       
                 member[필드] = 값
                 member[f"{필드}_기록"] = f"(기록됨: {값})"
                 수정된필드[필드] = 값
@@ -1006,6 +1003,17 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
                 member["회원번호"] = member_no
                 member["회원번호_기록"] = f"(기록됨: {member_no})"
                 수정된필드["회원번호"] = member_no
+
+
+
+
+            # ✅ 마지막에 "삭제"라는 값은 무조건 공란("")으로 변환
+            for k, v in 수정된필드.items():
+                if str(v).strip() == "삭제":
+                    수정된필드[k] = ""
+                    member[k] = ""
+                    member[f"{k}_기록"] = "(기록됨: 공란)"
+
 
     return member, 수정된필드
 
