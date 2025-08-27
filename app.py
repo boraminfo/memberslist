@@ -1007,12 +1007,17 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
 
 
 
-            # ✅ 마지막에 "삭제"라는 값은 무조건 공란("")으로 변환
-            for k, v in 수정된필드.items():
-                if str(v).strip() == "삭제":
+            # ✅ "삭제", "지움", "비움" 등은 모두 공란("")으로 변환
+            delete_keywords = {"삭제", "지움", "비움", "지우기", "없음", "없애기", "비워"}
+            for k, v in list(수정된필드.items()):
+                if str(v).strip() in delete_keywords:
                     수정된필드[k] = ""
                     member[k] = ""
-                    member[f"{k}_기록"] = "(기록됨: 공란)"
+                    # ✅ 기록 자체도 아예 삭제
+                    if f"{k}_기록" in member:
+                        del member[f"{k}_기록"]
+
+
 
 
     return member, 수정된필드
