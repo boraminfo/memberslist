@@ -1556,8 +1556,15 @@ def save_to_sheet(sheet_name: str, member_name: str, content: str) -> bool:
         raise RuntimeError(f"'{sheet_name}' 시트를 찾을 수 없습니다.")
 
     ts = now_str_kr()
-    sheet.insert_row([ts, (member_name or "").strip(), (content or "").strip()], index=2)
+
+    # ✅ 저장 전에 내용 앞부분에서 회원명이 중복되면 제거
+    clean_content = (content or "").strip()
+    if member_name and clean_content.startswith(member_name):
+        clean_content = clean_content[len(member_name):].strip()
+
+    sheet.insert_row([ts, (member_name or "").strip(), clean_content], index=2)
     return True
+
 
 
 
