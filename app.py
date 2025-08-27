@@ -837,6 +837,20 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             값 = match.group(1).strip()
 
 
+            # ✅ 필드 삭제 키워드 즉시 처리 후 중단
+            field_delete_keywords = {"지움", "비움", "지우기", "없음", "없애기", "비워"}
+            if 값 in field_delete_keywords:
+                필드 = 필드맵[키]
+                수정된필드[필드] = ""
+                member[필드] = ""
+                if f"{필드}_기록" in member:
+                    del member[f"{필드}_기록"]
+                continue   # 👈 이후 로직(전화번호 정규화 등) 건너뜀
+
+
+
+
+
 
             # ✅ 공통 꼬리 명령어 제거 대상 필드
             if 키 in {"주소", "메모", "휴대폰번호", "회원번호", "특수번호", "가입일자", "생년월일",
