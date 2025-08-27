@@ -378,7 +378,7 @@ def update_member():
 
             if any(field in 요청문 for field in field_keywords):
                 # 🔥 기존: 에러 반환 → 변경: updateMember 실행
-                import re
+              
                 요청문 = re.sub(r"삭제$", "비움", 요청문.strip())  # 끝에 오는 '삭제'만 안전하게 치환
                 return updateMember({"요청문": 요청문})
 
