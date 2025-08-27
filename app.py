@@ -577,7 +577,7 @@ def parse_request_and_update_multi(data: str, member: dict) -> dict:
 
 
 
-import re
+
 
 # ✅ 꼬리 명령어 정제 함수 추가
 def clean_tail_command(text):
@@ -791,7 +791,16 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
         for i in range(len(tokens) - 1):
             키워드 = tokens[i]
             값 = tokens[i + 1]
+
+
+
             if 키워드 in 필드맵:
+
+
+                # ✅ 공백/삭제 키워드 처리
+                if 값 in {"삭제", "지움", "비움", "공백", "없음", "없애기", "비워"}:
+                    값 = ""
+
                 필드 = 필드맵[키워드]
 
        
@@ -819,15 +828,14 @@ def parse_request_and_update(data: str, member: dict) -> tuple:
             값 = match.group(1).strip()
 
 
-            # ✅ 필드 삭제 키워드 즉시 처리 후 중단
-            field_delete_keywords = {"지움", "비움", "지우기", "없음", "없애기", "비워"}
+            # ✅ 필드 삭제 키워드 즉시 처리
+            field_delete_keywords = {"지움", "비움", "지우기", "없음", "없애기", "비워", "공백", "삭제"}
             if 값 in field_delete_keywords:
                 필드 = 필드맵[키]
                 수정된필드[필드] = ""
                 member[필드] = ""
-                if f"{필드}_기록" in member:
-                    del member[f"{필드}_기록"]
-                continue   # 👈 이후 로직(전화번호 정규화 등) 건너뜀
+                member.pop(f"{필드}_기록", None)
+                continue
 
 
 
