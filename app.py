@@ -358,36 +358,36 @@ def update_member():
 
         # ✅ 회원 전체 삭제 감지
         if "삭제" in 요청문:
-            sheet = get_member_sheet()
-            db = sheet.get_all_records()
-            member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
+        sheet = get_member_sheet()
+        db = sheet.get_all_records()
+        member_names = [str(row.get("회원명", "")).strip() for row in db if row.get("회원명")]
 
-            name = None
-            for candidate in sorted(member_names, key=lambda x: -len(x)):
-                if candidate in 요청문:
-                    name = candidate
-                    break
+        name = None
+        for candidate in sorted(member_names, key=lambda x: -len(x)):
+            if candidate in 요청문:
+                name = candidate
+                break
 
-            if not name:
-                return jsonify({"error": "삭제할 회원명을 찾을 수 없습니다."}), 400
+        if not name:
+            return jsonify({"error": "삭제할 회원명을 찾을 수 없습니다."}), 400
 
-            # 👉 요청문에 필드명이 같이 들어 있으면 전체삭제가 아님
-            field_keywords = {"주소", "휴대폰번호", "회원번호", "특수번호", "가입일자", "생년월일",
-                              "통신사", "친밀도", "근무처", "계보도", "소개한분", "메모", "코드"}
+        # 👉 요청문에 필드명이 같이 들어 있으면 전체삭제가 아님
+        field_keywords = {"주소", "휴대폰번호", "회원번호", "특수번호", "가입일자", "생년월일",
+                        "통신사", "친밀도", "근무처", "계보도", "소개한분", "메모", "코드"}
 
-            if any(field in 요청문 for field in field_keywords):
-                return jsonify({
-                    "message": "필드를 지우려면 '삭제' 대신 '지움', '비움', '지우기' 등을 사용해 주세요."
-                }), 400
+        if any(field in 요청문 for field in field_keywords):
+            # 🔥 기존: 에러 반환 → 변경: updateMember 실행
+            요청문 = re.sub(r"삭제$", "비움", 요청문.strip())  # 안전하게 치환
+            return updateMember({"요청문": 요청문})
 
-            # 👉 전체삭제는 '회원명 + 삭제' 두 단어일 때만 진행
-            tokens = 요청문.replace(",", " ").split()
-            if len(tokens) == 2 and tokens[0] == name and tokens[1] == "삭제":
-                return delete_member_direct(name)
+        # 👉 전체삭제는 '회원명 + 삭제' 두 단어일 때만 진행
+        tokens = 요청문.replace(",", " ").split()
+        if len(tokens) == 2 and tokens[0] == name and tokens[1] == "삭제":
+            return delete_member_direct(name)
 
-            return jsonify({
-                "message": "회원 전체 삭제는 '회원명 삭제' 형식으로만 가능합니다."
-            }), 400
+        return jsonify({
+            "message": "회원 전체 삭제는 '회원명 삭제' 형식으로만 가능합니다."
+        }), 400
 
 
 
